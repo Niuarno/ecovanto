@@ -143,7 +143,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: Math.min(idx * 0.06, 0.3) }}
-            className={`w-[280px] sm:w-[320px] md:w-[360px] lg:w-[390px] flex-shrink-0 ${
+            className={`w-[230px] xs:w-[260px] sm:w-[320px] md:w-[360px] lg:w-[390px] flex-shrink-0 ${
               dragMoved ? 'pointer-events-none' : ''
             }`}
           >

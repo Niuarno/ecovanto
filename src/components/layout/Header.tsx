@@ -29,36 +29,36 @@ export const Header: React.FC = () => {
     <header
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-500 select-none ${
         isScrolledPastTop
-          ? 'bg-background/92 backdrop-blur-md border-b border-border py-3.5'
+          ? 'bg-background/95 backdrop-blur-md border-b border-border py-3 md:py-3.5 shadow-sm'
           : isDark
-          ? 'bg-gradient-to-b from-black/80 via-black/40 to-transparent py-5'
-          : 'bg-gradient-to-b from-white/90 via-white/50 to-transparent py-5'
+          ? 'bg-gradient-to-b from-black/85 via-black/40 to-transparent py-3.5 md:py-5'
+          : 'bg-gradient-to-b from-white/95 via-white/50 to-transparent py-3.5 md:py-5'
       }`}
     >
-      <div className="max-w-[1800px] mx-auto px-4 md:px-8 lg:px-12 flex items-center justify-between">
+      <div className="max-w-[1800px] mx-auto px-3 sm:px-6 md:px-8 lg:px-12 flex items-center justify-between">
         {/* LEFT: Menu Trigger & Desktop Navigation */}
-        <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-4 md:space-x-6 z-10 flex-shrink-0">
           <button
             onClick={() => setIsMobileMenuOpen(true)}
             data-cursor="link"
-            className="group flex items-center space-x-2.5 text-xs font-mono tracking-widest text-foreground hover:opacity-80 uppercase transition-colors"
+            className="group flex items-center space-x-2 text-xs font-mono tracking-widest text-foreground hover:opacity-80 uppercase transition-colors"
             aria-label="Open Navigation Menu"
           >
             <div className="flex flex-col space-y-1 w-4">
-              <span className="w-full h-[1px] bg-foreground transition-transform duration-300 group-hover:translate-x-0.5" />
-              <span className="w-3/4 h-[1px] bg-foreground transition-transform duration-300 group-hover:translate-x-1" />
+              <span className="w-full h-[1.5px] bg-foreground transition-transform duration-300 group-hover:translate-x-0.5" />
+              <span className="w-3/4 h-[1.5px] bg-foreground transition-transform duration-300 group-hover:translate-x-1" />
             </div>
-            <span className="hidden sm:inline">MENU</span>
+            <span className="text-[11px] sm:text-xs">MENU</span>
           </button>
 
-          {/* Desktop Direct Links */}
+          {/* Desktop Direct Navigation Links */}
           <nav className="hidden lg:flex items-center space-x-6 text-[11px] font-mono tracking-widest uppercase text-muted">
             <Link
               to="/shop"
               data-cursor="link"
               className={`hover:text-foreground transition-colors relative py-1 ${
                 location.pathname === '/shop'
-                  ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1px] after:bg-foreground'
+                  ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1px] after:bg-foreground font-medium'
                   : ''
               }`}
             >
@@ -69,7 +69,7 @@ export const Header: React.FC = () => {
               data-cursor="link"
               className={`hover:text-foreground transition-colors relative py-1 ${
                 location.pathname.startsWith('/categories')
-                  ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1px] after:bg-foreground'
+                  ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1px] after:bg-foreground font-medium'
                   : ''
               }`}
             >
@@ -80,7 +80,7 @@ export const Header: React.FC = () => {
               data-cursor="link"
               className={`hover:text-foreground transition-colors relative py-1 ${
                 location.pathname.startsWith('/collections')
-                  ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1px] after:bg-foreground'
+                  ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1px] after:bg-foreground font-medium'
                   : ''
               }`}
             >
@@ -91,7 +91,7 @@ export const Header: React.FC = () => {
               data-cursor="link"
               className={`hover:text-foreground transition-colors relative py-1 ${
                 location.pathname === '/campaign'
-                  ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1px] after:bg-foreground'
+                  ? 'text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[1px] after:bg-foreground font-medium'
                   : ''
               }`}
             >
@@ -100,23 +100,23 @@ export const Header: React.FC = () => {
           </nav>
         </div>
 
-        {/* CENTER: Brand Logo Wordmark */}
-        <div className="absolute left-1/2 -translate-x-1/2 text-center">
+        {/* CENTER: Brand Logo Wordmark (Never Collides with Surrounding Elements) */}
+        <div className="absolute left-1/2 -translate-x-1/2 text-center pointer-events-auto">
           <Link
             to="/"
             data-cursor="link"
             className="inline-block group focus:outline-none"
             aria-label="ECOVANTO Homepage"
           >
-            <span className="font-display font-light text-lg md:text-2xl tracking-[0.35em] uppercase text-foreground transition-opacity group-hover:opacity-80">
+            <span className="font-display font-light text-base sm:text-lg md:text-2xl tracking-[0.25em] sm:tracking-[0.35em] uppercase text-foreground transition-opacity group-hover:opacity-80 truncate block">
               ECOVANTO
             </span>
           </Link>
         </div>
 
-        {/* RIGHT: Actions (Theme Swatch, Account, Search, Favorites, Cart) */}
-        <div className="flex items-center space-x-3 md:space-x-5 text-xs font-mono tracking-widest uppercase text-foreground">
-          {/* THEME SWATCH TOGGLE */}
+        {/* RIGHT: Actions Cluster (Cleanly Responsive for All Screen Sizes) */}
+        <div className="flex items-center space-x-2.5 sm:space-x-4 md:space-x-5 text-xs font-mono tracking-widest uppercase text-foreground z-10 flex-shrink-0">
+          {/* THEME SWATCH TOGGLE (Responsive) */}
           <div className="hidden sm:block">
             <ThemeToggle variant="compact" />
           </div>
@@ -124,21 +124,28 @@ export const Header: React.FC = () => {
             <ThemeToggle variant="minimal" />
           </div>
 
-          {/* CUSTOMER ACCOUNT */}
+          {/* CUSTOMER ACCOUNT (Responsive: Icon on mobile, full name on desktop) */}
           <Link
             to="/account"
             data-cursor="link"
             className="hover:opacity-80 transition-opacity py-1 flex items-center space-x-1"
             aria-label="Client Account"
+            title={isAuthenticated && user ? `Signed in as ${user.firstName}` : 'Client Account'}
           >
             {isAuthenticated && user ? (
-              <span className="font-semibold text-foreground underline underline-offset-4">
-                {user.firstName.toUpperCase()}
-              </span>
+              <>
+                <span className="hidden md:inline font-semibold text-foreground underline underline-offset-4 max-w-[120px] truncate">
+                  {user.firstName.toUpperCase()}
+                </span>
+                <div className="relative md:hidden flex items-center">
+                  <User className="w-3.5 h-3.5 text-foreground" />
+                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                </div>
+              </>
             ) : (
               <>
                 <span className="hidden md:inline">ACCOUNT</span>
-                <User className="w-3.5 h-3.5 md:hidden" />
+                <User className="w-3.5 h-3.5 md:hidden text-foreground" />
               </>
             )}
           </Link>
@@ -151,18 +158,18 @@ export const Header: React.FC = () => {
             aria-label="Open Search"
           >
             <span className="hidden md:inline">SEARCH</span>
-            <span className="md:hidden text-sm">⌕</span>
+            <span className="md:hidden text-xs">⌕</span>
           </button>
 
-          {/* FAVORITES */}
+          {/* FAVORITES (Hidden on very small screens, fully in Menu) */}
           <button
             onClick={() => setIsFavoritesOpen(true)}
             data-cursor="link"
-            className="hover:opacity-80 transition-opacity py-1 flex items-center space-x-1"
+            className="hidden xs:flex items-center space-x-1 hover:opacity-80 transition-opacity py-1"
             aria-label="Open Favorites"
           >
             <span className="hidden md:inline">FAVORITES</span>
-            <span className="md:hidden">♡</span>
+            <span className="md:hidden text-xs">♡</span>
             {totalFavorites > 0 && (
               <span className="text-[10px] text-muted">[{totalFavorites}]</span>
             )}
@@ -175,8 +182,8 @@ export const Header: React.FC = () => {
             className="hover:opacity-80 transition-opacity py-1 flex items-center space-x-1 group"
             aria-label="Open Shopping Bag"
           >
-            <span>BAG</span>
-            <span className="font-medium group-hover:underline">
+            <span className="text-[11px] sm:text-xs">BAG</span>
+            <span className="font-semibold text-foreground group-hover:underline text-[11px] sm:text-xs">
               .{totalItems}
             </span>
           </button>

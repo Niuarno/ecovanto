@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ArrowRight, Tag, Sparkles } from 'lucide-react';
+import { X, ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUI } from '../../context/UIContext';
 
@@ -38,7 +38,7 @@ export const StoreOfferPopup: React.FC = () => {
 
   return (
     <>
-      {/* Minimized floating trigger badge if closed */}
+      {/* Minimized floating trigger badge if closed (Compact & Non-colliding on Mobile) */}
       {isMinimized && (
         <motion.button
           initial={{ opacity: 0, y: 20 }}
@@ -48,10 +48,10 @@ export const StoreOfferPopup: React.FC = () => {
             setIsOpen(true);
           }}
           data-cursor="link"
-          className="fixed bottom-6 left-6 z-40 px-3.5 py-2 bg-surface border border-border hover:border-foreground shadow-2xl text-xs font-mono text-foreground flex items-center space-x-2 backdrop-blur-md transition-colors"
+          className="fixed bottom-4 left-3 sm:left-6 z-40 px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-surface/90 border border-border hover:border-foreground shadow-2xl text-[10px] sm:text-xs font-mono text-foreground flex items-center space-x-1.5 sm:space-x-2 backdrop-blur-md transition-colors"
         >
-          <Sparkles className="w-3.5 h-3.5 text-accent" />
-          <span className="tracking-widest uppercase">10% PRIVILEGE CODE</span>
+          <Sparkles className="w-3 h-3 text-accent" />
+          <span className="tracking-widest uppercase">10% PRIVILEGE</span>
         </motion.button>
       )}
 
@@ -73,7 +73,7 @@ export const StoreOfferPopup: React.FC = () => {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 20 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-full max-w-lg bg-surface border border-border p-8 md:p-10 z-10 text-foreground shadow-2xl overflow-hidden transition-colors"
+              className="relative w-full max-w-lg bg-surface border border-border p-6 sm:p-8 md:p-10 z-10 text-foreground shadow-2xl overflow-hidden transition-colors"
             >
               {/* Close button */}
               <button
@@ -84,13 +84,13 @@ export const StoreOfferPopup: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="space-y-6 text-center">
+              <div className="space-y-5 sm:space-y-6 text-center">
                 <div className="inline-flex items-center space-x-2 text-[10px] font-mono tracking-[0.25em] text-muted uppercase">
                   <Sparkles className="w-3.5 h-3.5 text-accent" />
                   <span>ATELIER PRIVATE ACCESS</span>
                 </div>
 
-                <h2 className="text-3xl md:text-4xl font-light font-display tracking-tight uppercase text-foreground">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-light font-display tracking-tight uppercase text-foreground">
                   INAUGURAL <br />
                   <span className="font-serif italic font-normal text-stroke-strong">10% DISCOUNT</span>
                 </h2>
@@ -100,7 +100,7 @@ export const StoreOfferPopup: React.FC = () => {
                 </p>
 
                 {/* Voucher Code Box */}
-                <div className="p-4 bg-background border border-border flex items-center justify-between font-mono text-xs">
+                <div className="p-3.5 sm:p-4 bg-background border border-border flex items-center justify-between font-mono text-xs">
                   <div className="text-left">
                     <span className="text-[9px] text-muted uppercase block">VOUCHER CODE</span>
                     <span className="text-sm font-semibold tracking-widest text-foreground">ATELIER10</span>
@@ -108,7 +108,7 @@ export const StoreOfferPopup: React.FC = () => {
                   <button
                     onClick={handleCopyCode}
                     data-cursor="link"
-                    className="px-4 py-2 bg-foreground text-background text-[11px] uppercase tracking-wider font-medium hover:opacity-90 transition-opacity"
+                    className="px-3 sm:px-4 py-2 bg-foreground text-background text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold hover:opacity-90 transition-opacity"
                   >
                     COPY CODE
                   </button>
@@ -119,14 +119,14 @@ export const StoreOfferPopup: React.FC = () => {
                     to="/shop"
                     onClick={handleClose}
                     data-cursor="link"
-                    className="flex-1 py-3.5 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity flex items-center justify-center space-x-2"
+                    className="flex-1 py-3 sm:py-3.5 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity flex items-center justify-center space-x-2 font-semibold"
                   >
                     <span>EXPLORE ARCHIVE</span>
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                   <button
                     onClick={handleClose}
-                    className="px-4 py-3.5 border border-border hover:border-foreground text-muted hover:text-foreground font-mono text-xs uppercase tracking-widest transition-colors"
+                    className="px-4 py-3 sm:py-3.5 border border-border hover:border-foreground text-muted hover:text-foreground font-mono text-xs uppercase tracking-widest transition-colors"
                   >
                     MAYBE LATER
                   </button>

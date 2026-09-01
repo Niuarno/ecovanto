@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, MessageSquare, Bot, User, ArrowRight } from 'lucide-react';
+import { X, Send, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface Message {
@@ -59,59 +59,46 @@ export const OrioChatbox: React.FC = () => {
 
     if (q.includes('fabric') || q.includes('material') || q.includes('wool') || q.includes('leather')) {
       return {
-        text: "We exclusively craft garments from certified European deadstock: 750gsm Austrian Loden wool, 280gsm Italian viscose crepe, full-grain vegetable-tanned bridal leather, and 100% Cupro jacquard monogram linings.",
+        text: "We source exclusively from heritage northern Italian and Austrian mills, salvaging deadstock virgin wools, cupro linings, high-twist viscose, and vegetable-tanned bridal leathers with raw edge architectural finishes.",
         quickAction: { label: 'READ ATELIER MANIFESTO', link: '/about' },
       };
     }
 
-    if (q.includes('ship') || q.includes('delivery') || q.includes('country') || q.includes('israel')) {
-      if (q.includes('israel')) {
-        return {
-          text: "In accordance with our atelier trade policies, we dispatch worldwide via DHL Express and UPS Carbon Neutral to over 70 recognized countries across Europe, the Americas, Asia-Pacific, and the Middle East, excluding Israel.",
-          quickAction: { label: 'VIEW SHIPPING DIRECTORY', link: '/shipping' },
-        };
-      }
+    if (q.includes('ship') || q.includes('delivery') || q.includes('transit') || q.includes('country') || q.includes('track')) {
       return {
-        text: "We ship globally via DHL Express and UPS. Orders across the European Union arrive in 1-3 business days. Delivery is completely complimentary on orders exceeding €500.",
-        quickAction: { label: 'SHIPPING & TRANSIT TIMELINES', link: '/shipping' },
+        text: "All dispatches depart directly from our Berlin Kreuzberg atelier via DHL Express Carbon Neutral or UPS Express Saver. European orders arrive in 1-3 business days. Complimentary express delivery is applied automatically on acquisitions exceeding €500.",
+        quickAction: { label: 'LOOKUP PARCEL DISPATCH', link: '/orders' },
       };
     }
 
-    if (q.includes('discount') || q.includes('code') || q.includes('promo') || q.includes('voucher') || q.includes('offer')) {
+    if (q.includes('appointment') || q.includes('berlin') || q.includes('showroom') || q.includes('visit') || q.includes('fitting')) {
       return {
-        text: "You can apply private atelier code 'ATELIER10' during checkout for an immediate 10% deduction across your inaugural acquisition.",
-        quickAction: { label: 'PROCEED TO BAG', link: '/checkout' },
+        text: "The ECOVANTO showroom is located at Köpenicker Str. 124 in Berlin Kreuzberg. Private fittings and bespoke consultations are held Tuesday through Saturday by appointment.",
+        quickAction: { label: 'SCHEDULE PRIVATE FITTING', link: '/contact' },
       };
     }
 
-    if (q.includes('showroom') || q.includes('berlin') || q.includes('visit') || q.includes('appointment') || q.includes('address')) {
+    if (q.includes('discount') || q.includes('voucher') || q.includes('code') || q.includes('offer')) {
       return {
-        text: "Our physical atelier is situated at Köpenicker Str. 124, 10997 Berlin (Kreuzberg). Private appointments and bespoke fittings are hosted Tuesday through Saturday.",
-        quickAction: { label: 'BOOK PRIVATE APPOINTMENT', link: '/contact' },
-      };
-    }
-
-    if (q.includes('track') || q.includes('order') || q.includes('status')) {
-      return {
-        text: "You can track your parcel dispatch in real-time by entering your order reference number (e.g., #ECO-94821) in our Order Directory.",
-        quickAction: { label: 'TRACK ORDER DIRECTORY', link: '/orders' },
+        text: "Use inaugural private access voucher code 'ATELIER10' during checkout for 10% privilege deduction on the Autumn/Winter 2026 Archive.",
+        quickAction: { label: 'BROWSE AUTUMN ARCHIVE', link: '/shop' },
       };
     }
 
     return {
-      text: "Atelier Ecovanto balances structural rigor with underground nocturnal European luxury. If your query requires specialized master tailor attention, our concierge team is on standby.",
-      quickAction: { label: 'CONTACT CONCIERGE', link: '/contact' },
+      text: "Understood. The Berlin studio team has logged your inquiry. If you require specialized suiting tailoring, custom sizing, or press lookbooks, you may reach our human concierge directly at atelier@ecovanto.com.",
+      quickAction: { label: 'TRANSMIT DIRECT INQUIRY', link: '/contact' },
     };
   };
 
   const handleSend = (textToSend?: string) => {
-    const messageText = textToSend || input;
-    if (!messageText.trim()) return;
+    const query = textToSend || input.trim();
+    if (!query) return;
 
     const userMsg: Message = {
-      id: `usr-${Date.now()}`,
+      id: `msg-${Date.now()}`,
       sender: 'user',
-      text: messageText.trim(),
+      text: query,
       timestamp: 'JUST NOW',
     };
 
@@ -120,30 +107,33 @@ export const OrioChatbox: React.FC = () => {
     setIsTyping(true);
 
     setTimeout(() => {
-      const reply = generateOrioResponse(messageText);
+      const responseData = generateOrioResponse(query);
       const orioMsg: Message = {
-        id: `orio-${Date.now()}`,
+        id: `msg-resp-${Date.now()}`,
         sender: 'orio',
-        text: reply.text,
+        text: responseData.text,
         timestamp: 'JUST NOW',
-        quickAction: reply.quickAction,
+        quickAction: responseData.quickAction,
       };
       setMessages((prev) => [...prev, orioMsg]);
       setIsTyping(false);
-    }, 700);
+    }, 650);
   };
 
   return (
     <>
-      {/* Floating Trigger Button */}
+      {/* Floating Trigger Button (Compact on Mobile, Full on Desktop) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         data-cursor="link"
-        className="fixed bottom-6 right-6 z-40 px-4 py-3 bg-surface border border-border hover:border-foreground shadow-2xl text-xs font-mono text-foreground flex items-center space-x-2.5 backdrop-blur-md transition-colors"
+        className="fixed bottom-4 right-3 sm:right-6 z-40 px-3 sm:px-4 py-2 sm:py-3 bg-surface/90 border border-border hover:border-foreground shadow-2xl text-[10px] sm:text-xs font-mono text-foreground flex items-center space-x-1.5 sm:space-x-2.5 backdrop-blur-md transition-colors"
         aria-label="Open Orio AI Concierge"
       >
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="tracking-widest uppercase font-semibold">ORIO AI // CONCIERGE</span>
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+        <span className="tracking-widest uppercase font-semibold">
+          <span className="sm:hidden">ORIO // AI</span>
+          <span className="hidden sm:inline">ORIO AI // CONCIERGE</span>
+        </span>
       </button>
 
       {/* Chat Window */}
@@ -154,10 +144,10 @@ export const OrioChatbox: React.FC = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.96 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed bottom-20 right-4 md:right-8 z-50 w-[92vw] sm:w-[420px] h-[540px] max-h-[85vh] bg-surface border border-border-strong shadow-2xl flex flex-col justify-between text-foreground select-none overflow-hidden"
+            className="fixed bottom-16 sm:bottom-20 right-2 sm:right-6 md:right-8 z-50 w-[95vw] sm:w-[420px] h-[520px] max-h-[82vh] bg-surface border border-border-strong shadow-2xl flex flex-col justify-between text-foreground select-none overflow-hidden"
           >
             {/* Chat Header */}
-            <div className="p-4 bg-surface-subtle border-b border-border flex items-center justify-between">
+            <div className="p-3.5 sm:p-4 bg-surface-subtle border-b border-border flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
                 <div className="w-7 h-7 bg-foreground text-background flex items-center justify-center text-xs font-mono font-bold">
                   🐾
@@ -182,7 +172,7 @@ export const OrioChatbox: React.FC = () => {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-background text-xs font-mono">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 bg-background text-xs font-mono">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
@@ -191,7 +181,7 @@ export const OrioChatbox: React.FC = () => {
                   }`}
                 >
                   <div
-                    className={`max-w-[85%] p-3.5 leading-relaxed ${
+                    className={`max-w-[88%] sm:max-w-[85%] p-3 sm:p-3.5 leading-relaxed ${
                       msg.sender === 'user'
                         ? 'bg-foreground text-background font-medium'
                         : 'bg-surface border border-border text-foreground'
@@ -245,19 +235,19 @@ export const OrioChatbox: React.FC = () => {
                 e.preventDefault();
                 handleSend();
               }}
-              className="p-3 bg-surface border-t border-border flex items-center space-x-2"
+              className="p-2.5 sm:p-3 bg-surface border-t border-border flex items-center space-x-2"
             >
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="ASK ORIO REGARDING SIZING, DISPATCH, FABRICS..."
-                className="flex-1 bg-background border border-border p-2.5 text-xs font-mono text-foreground placeholder-muted focus:outline-none focus:border-foreground"
+                placeholder="ASK ORIO SIZING, FABRICS, TRANSIT..."
+                className="flex-1 bg-background border border-border p-2 sm:p-2.5 text-xs font-mono text-foreground placeholder-muted focus:outline-none focus:border-foreground"
               />
               <button
                 type="submit"
                 disabled={!input.trim()}
-                className="p-2.5 bg-foreground text-background hover:opacity-90 disabled:opacity-40 transition-opacity"
+                className="p-2 sm:p-2.5 bg-foreground text-background hover:opacity-90 disabled:opacity-40 transition-opacity"
                 aria-label="Send inquiry"
               >
                 <Send className="w-4 h-4" />
