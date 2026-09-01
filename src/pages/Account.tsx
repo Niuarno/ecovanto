@@ -36,7 +36,7 @@ declare global {
 }
 
 export const Account: React.FC = () => {
-  const { user, isAuthenticated, login, register, logout, updateProfile } = useAuth();
+  const { user, isAuthenticated, login, register, logout, updateProfile, loginWithGoogleData } = useAuth();
   const { orders, settings } = useStore();
   const { favorites } = useFavorites();
   const { showToast } = useUI();
@@ -80,7 +80,7 @@ export const Account: React.FC = () => {
         },
       };
 
-      updateProfile(realGoogleUser);
+      loginWithGoogleData(realGoogleUser);
       showToast({
         type: 'success',
         title: 'GOOGLE AUTHENTICATED',

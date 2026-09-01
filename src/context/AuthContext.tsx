@@ -26,6 +26,7 @@ interface AuthContextType {
   isAdminAuthenticated: boolean;
   login: (email: string, pass: string) => Promise<boolean>;
   loginWithGmail: () => Promise<UserProfile>;
+  loginWithGoogleData: (profileData: UserProfile) => UserProfile;
   register: (data: { email: string; password?: string; firstName: string; lastName: string; phone?: string }) => Promise<UserProfile>;
   logout: () => void;
   adminLogin: (passcode: string) => boolean;
@@ -33,7 +34,7 @@ interface AuthContextType {
   updateProfile: (updates: Partial<UserProfile>) => void;
 }
 
-const AUTH_USER_KEY = 'ecovanto_auth_customer_v1';
+const AUTH_USER_KEY = 'ecovanto_auth_customer_v2';
 const ADMIN_AUTH_KEY = 'ecovanto_admin_session_v1';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -65,7 +66,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const login = async (email: string, _pass: string): Promise<boolean> => {
-    // Realistic client login
     const namePart = email.split('@')[0];
     const newUser: UserProfile = {
       id: `usr-${Date.now()}`,
@@ -82,11 +82,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     };
     setUser(newUser);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(newUser));
     return true;
   };
 
+  const loginWithGoogleData = (profileData: UserProfile): UserProfile => {
+    setUser(profileData);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(profileData));
+    return profileData;
+  };
+
   const loginWithGmail = async (): Promise<UserProfile> => {
-    // 1-click Google OAuth simulator with realistic profile
     const gmailUser: UserProfile = {
       id: `usr-gmail-${Date.now()}`,
       email: 'client.atelier@gmail.com',
@@ -105,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     };
     setUser(gmailUser);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(gmailUser));
     return gmailUser;
   };
 
@@ -116,17 +123,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastName: data.lastName,
       phone: data.phone || '',
       createdAt: new Date().toISOString(),
+      defaultAddress: {
+        address: 'Auguststraße 14',
+        city: 'Berlin',
+        postalCode: '10117',
+        country: 'Germany',
+      },
     };
     setUser(newUser);
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(newUser));
     return newUser;
   };
 
   const logout = () => {
     setUser(null);
+    localStorage.removeItem(AUTH_USER_KEY);
   };
 
   const adminLogin = (passcode: string): boolean => {
-    // Secure passcode check (default: ATELIER2026 or 2026 or admin)
     if (passcode.trim() === 'ATELIER2026' || passcode.trim() === 'admin' || passcode.trim() === '2026') {
       setIsAdminAuthenticated(true);
       sessionStorage.setItem(ADMIN_AUTH_KEY, 'true');
@@ -141,7 +155,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProfile = (updates: Partial<UserProfile>) => {
-    setUser((prev) => (prev ? { ...prev, ...updates } : null));
+    setUser((prev) => {
+      const updated = prev ? { ...prev, ...updates } : (updates as UserProfile);
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   return (
@@ -152,6 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAdminAuthenticated,
         login,
         loginWithGmail,
+        loginWithGoogleData,
         register,
         logout,
         adminLogin,
