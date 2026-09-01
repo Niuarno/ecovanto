@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CATEGORIES } from '../data/categories';
+import { useStore } from '../context/StoreContext';
 import { ArrowUpRight } from 'lucide-react';
 
 export const CategoriesList: React.FC = () => {
+  const { categories } = useStore();
   return (
     <div className="min-h-screen bg-background pt-28 md:pt-36 pb-24 text-foreground select-none transition-colors duration-300">
       <div className="max-w-[1800px] mx-auto px-4 md:px-8 lg:px-12">
@@ -24,7 +25,7 @@ export const CategoriesList: React.FC = () => {
 
         {/* Categories Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {CATEGORIES.map((category, index) => (
+          {categories.map((category, index) => (
             <Link
               key={category.id}
               to={`/categories/${category.slug}`}

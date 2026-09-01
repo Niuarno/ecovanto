@@ -42,8 +42,9 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
     return () => window.removeEventListener('resize', checkScrollState);
   }, [products, checkScrollState]);
 
-  // Pointer Drag Handling with Momentum & Threshold
+  // Mouse Drag Handling on Desktop (Bypassed on Touch to allow natural vertical & horizontal phone gestures)
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return; // Crucial: allow native touch scrolling on mobile without trapping vertical page scroll!
     if (!containerRef.current) return;
     if (e.button !== 0) return;
     setIsDragging(true);
@@ -53,18 +54,20 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
     if (!isDragging || !containerRef.current) return;
     const delta = e.clientX - startX;
-    if (Math.abs(delta) > 5) {
+    if (Math.abs(delta) > 6) {
       setDragMoved(true);
     }
-    containerRef.current.scrollLeft = scrollLeft - delta * 1.4;
+    containerRef.current.scrollLeft = scrollLeft - delta * 1.5;
     checkScrollState();
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return;
     setIsDragging(false);
-    setTimeout(() => setDragMoved(false), 50);
+    setTimeout(() => setDragMoved(false), 60);
   };
 
   const handlePointerCancel = () => {
@@ -79,9 +82,9 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
   };
 
   return (
-    <section className="py-20 md:py-28 border-b border-border select-none overflow-hidden bg-background transition-colors">
+    <section className="py-16 md:py-28 border-b border-border select-none overflow-hidden bg-background transition-colors">
       {/* Section Header */}
-      <div className="max-w-[1800px] mx-auto px-4 md:px-8 lg:px-12 mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="max-w-[1800px] mx-auto px-4 md:px-8 lg:px-12 mb-6 sm:mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <div className="flex items-center space-x-3 text-[10px] font-mono tracking-[0.25em] text-muted uppercase mb-1.5">
             <span>[ {sectionNumber} ]</span>
@@ -121,7 +124,7 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
         </div>
       </div>
 
-      {/* Horizontal Draggable Container */}
+      {/* Horizontal Draggable & Native Touch Swipable Container */}
       <div
         ref={containerRef}
         data-cursor="drag"
@@ -131,10 +134,13 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         onScroll={checkScrollState}
-        className={`flex space-x-6 md:space-x-8 px-4 md:px-8 lg:px-12 overflow-x-auto no-scrollbar touch-pan-x ${
+        className={`flex space-x-4 sm:space-x-6 md:space-x-8 px-4 md:px-8 lg:px-12 overflow-x-auto no-scrollbar overscroll-x-contain ${
           isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
         }`}
-        style={{ scrollBehavior: isDragging ? 'auto' : 'smooth' }}
+        style={{
+          scrollBehavior: isDragging ? 'auto' : 'smooth',
+          WebkitOverflowScrolling: 'touch',
+        }}
       >
         {products.map((product, idx) => (
           <motion.div
@@ -153,8 +159,8 @@ export const ProductCarousel: React.FC<ProductCarouselProps> = ({
       </div>
 
       {/* Scrub Progress Track */}
-      <div className="max-w-[1800px] mx-auto px-4 md:px-8 lg:px-12 mt-8 flex items-center justify-between">
-        <div className="w-48 sm:w-64 h-[1px] bg-border relative overflow-hidden">
+      <div className="max-w-[1800px] mx-auto px-4 md:px-8 lg:px-12 mt-6 sm:mt-8 flex items-center justify-between">
+        <div className="w-40 sm:w-64 h-[1px] bg-border relative overflow-hidden">
           <div
             className="absolute top-0 bottom-0 bg-foreground transition-all duration-150"
             style={{ width: '25%', left: `${scrollProgress * 0.75}%` }}

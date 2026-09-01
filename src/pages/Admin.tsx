@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useStore, Order, PaymentGatewaysConfig } from '../context/StoreContext';
-import { useAuth } from '../context/AuthContext';
+import { useStore, Order, PaymentGatewaysConfig, HeroSettings, DEFAULT_HERO } from '../context/StoreContext';
+import { useAuth, UserProfile } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { Product, Size } from '../types';
-import { CATEGORIES } from '../data/categories';
+import { Product, Size, Category } from '../types';
 import { COLLECTIONS } from '../data/collections';
 import {
   Package,
@@ -23,6 +22,11 @@ import {
   Upload,
   ArrowUpRight,
   LogOut,
+  Users,
+  Layout,
+  Layers,
+  Sparkles,
+  Share2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -30,11 +34,21 @@ export const Admin: React.FC = () => {
   const {
     products,
     orders,
+    categories,
+    hero,
+    customers,
     settings,
     addProduct,
     updateProduct,
     deleteProduct,
     resetProductsToDefault,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    resetCategoriesToDefault,
+    updateHero,
+    updateCustomer,
+    deleteCustomer,
     updateOrderStatus,
     updateSettings,
     updateGateways,
@@ -46,7 +60,9 @@ export const Admin: React.FC = () => {
   const [passcode, setPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'gateways' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'products' | 'categories' | 'hero' | 'orders' | 'customers' | 'gateways' | 'settings'
+  >('overview');
 
   // Product Modal State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -83,155 +99,101 @@ export const Admin: React.FC = () => {
     collection: 'Life Force',
     collectionSlug: 'life-force',
     sizes: ['XS', 'S', 'M', 'L'],
-    colors: [{ name: 'Pitch Noir', hex: '#0B0B0B' }],
+    colors: [{ name: 'Obsidian Noir', hex: '#0A0A0A' }],
     badge: 'NEW DROP',
-    tagline: 'Architectural silhouette engineered in Berlin',
-    description: 'Sculptural European luxury garment constructed from high-twist organic deadstock textiles.',
-    details: '100% Virgin Wool\nInternal boning\nMade in Berlin',
-    care: 'Dry clean only\nStore on wide padded hanger',
+    tagline: 'Handcrafted architectural evening piece with structural bias cut',
+    description: 'Sculptural silhouette engineered in Berlin from heavy Italian deadstock silk viscose.',
+    details: 'Raw architectural hem\nConcealed side zipper\nStructured internal bodice',
+    care: 'Dry clean only by luxury garment specialist\nStore in breathable garment bag',
     stock: 8,
   });
 
-  // Manual URL input helper for product form
-  const [singleImageUrlInput, setSingleImageUrlInput] = useState('');
+  // Category Modal State
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [categoryForm, setCategoryForm] = useState({
+    name: '',
+    slug: '',
+    count: 10,
+    image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1200&q=85',
+    description: '',
+    editorialQuote: '',
+  });
 
-  // Gateways form state - synced with store settings
+  // Hero Form State
+  const [heroForm, setHeroForm] = useState<HeroSettings>(hero || DEFAULT_HERO);
+
+  // Sync heroForm whenever hero changes in store
+  useEffect(() => {
+    if (hero) setHeroForm(hero);
+  }, [hero]);
+
+  // Customer search filter
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+
+  // Gateways form state
   const [gatewaysForm, setGatewaysForm] = useState<PaymentGatewaysConfig>(settings.gateways);
 
-  useEffect(() => {
-    setGatewaysForm(settings.gateways);
-  }, [settings.gateways]);
+  // Settings form state
+  const [settingsForm, setSettingsForm] = useState({
+    announcementText: settings.announcementText,
+    freeShippingThreshold: settings.freeShippingThreshold,
+    storeName: settings.storeName || 'ATELIER ECOVANTO',
+    discountCode: settings.discountCode,
+    discountPercentage: settings.discountPercentage,
+    googleClientId: settings.googleClientId || '',
+    facebookPixelId: settings.facebookPixelId || '',
+  });
 
-  // General settings form state
-  const [settingsForm, setSettingsForm] = useState(settings);
+  // Temporary Image URL Input
+  const [tempImageUrl, setTempImageUrl] = useState('');
 
-  useEffect(() => {
-    setSettingsForm(settings);
-  }, [settings]);
-
-  // Financial Metrics
-  const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
-  const totalUnitsSold = orders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.quantity, 0), 0);
-  const averageOrderValue = orders.length > 0 ? totalRevenue / orders.length : 0;
-  const lowStockProducts = products.filter((p) => p.stock <= 4);
-
-  // Security Gate Authentication
-  if (!isAdminAuthenticated) {
-    const handlePasscodeSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const success = adminLogin(passcode);
-      if (success) {
-        setPasscodeError(false);
-        showToast({
-          type: 'success',
-          title: 'ACCESS GRANTED',
-          message: 'Atelier Management Suite unlocked.',
-        });
-      } else {
-        setPasscodeError(true);
-      }
-    };
-
-    return (
-      <div className="min-h-screen bg-background pt-36 pb-24 flex items-center justify-center px-4 text-foreground select-none transition-colors duration-300">
-        <div className="w-full max-w-md p-8 md:p-10 bg-surface border border-border space-y-6 shadow-2xl">
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 rounded-full border border-border flex items-center justify-center mx-auto text-foreground">
-              <Lock className="w-5 h-5" />
-            </div>
-            <span className="text-[10px] font-mono tracking-[0.25em] text-muted uppercase block">
-              RESTRICTED ATELIER PORTAL
-            </span>
-            <h1 className="text-2xl font-light font-display tracking-widest uppercase text-foreground">
-              SECURITY ACCESS
-            </h1>
-            <p className="text-xs font-mono text-muted">
-              Enter the master atelier security passcode to manage inventory, customer dispatches, and payment credentials.
-            </p>
-          </div>
-
-          <form onSubmit={handlePasscodeSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-mono tracking-widest text-muted uppercase block">
-                MASTER PASSCODE
-              </label>
-              <input
-                type="password"
-                required
-                autoFocus
-                value={passcode}
-                onChange={(e) => {
-                  setPasscode(e.target.value);
-                  setPasscodeError(false);
-                }}
-                placeholder="ENTER PASSCODE (E.G. ATELIER2026)"
-                className="w-full bg-background border border-border p-3.5 text-xs font-mono text-foreground placeholder-muted focus:outline-none focus:border-foreground"
-              />
-            </div>
-
-            {passcodeError && (
-              <p className="text-xs font-mono text-red-500">
-                ACCESS DENIED. DEFAULT PASSCODE: 'ATELIER2026'
-              </p>
-            )}
-
-            <button
-              type="submit"
-              data-cursor="link"
-              className="w-full py-4 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity font-semibold"
-            >
-              UNLOCK ATELIER SUITE
-            </button>
-          </form>
-
-          <div className="text-center pt-2">
-            <Link to="/" className="text-xs font-mono text-muted hover:text-foreground underline uppercase">
-              RETURN TO PUBLIC STOREFRONT
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // File Upload Handler (Converts uploaded image to high-res Base64 Data URL)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File Upload Helper to convert local images to Base64 data URLs
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'product' | 'category' | 'hero') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     Array.from(files).forEach((file) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
+      reader.onload = () => {
+        const result = reader.result as string;
+        if (target === 'product') {
           setProductForm((prev) => ({
             ...prev,
-            images: [...prev.images, reader.result as string],
+            images: [...prev.images, result],
           }));
-          showToast({
-            type: 'info',
-            title: 'IMAGE UPLOADED',
-            message: `${file.name} attached to gallery.`,
-          });
+        } else if (target === 'category') {
+          setCategoryForm((prev) => ({
+            ...prev,
+            image: result,
+          }));
+        } else if (target === 'hero') {
+          setHeroForm((prev) => ({
+            ...prev,
+            imageUrl: result,
+          }));
         }
       };
       reader.readAsDataURL(file);
     });
+
+    e.target.value = '';
+    showToast({
+      type: 'success',
+      title: 'FILE UPLOADED',
+      message: 'Image encoded and attached.',
+    });
   };
 
-  const handleAddImageUrl = () => {
-    if (!singleImageUrlInput.trim()) return;
-    setProductForm((prev) => ({
-      ...prev,
-      images: [...prev.images, singleImageUrlInput.trim()],
-    }));
-    setSingleImageUrlInput('');
-  };
-
-  const handleRemoveImage = (index: number) => {
-    setProductForm((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index),
-    }));
+  const handlePasscodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminLogin(passcode)) {
+      setPasscodeError(false);
+      showToast({ type: 'success', title: 'ACCESS GRANTED', message: 'Welcome to Atelier Management Suite.' });
+    } else {
+      setPasscodeError(true);
+      showToast({ type: 'error', title: 'PASSCODE REJECTED', message: 'Try "ATELIER2026".' });
+    }
   };
 
   const openAddModal = () => {
@@ -242,8 +204,8 @@ export const Admin: React.FC = () => {
       price: 380,
       currency: 'EUR',
       images: ['https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1000&q=85'],
-      category: 'Dresses',
-      categorySlug: 'dresses',
+      category: categories[0]?.name || 'Dresses',
+      categorySlug: categories[0]?.slug || 'dresses',
       collection: 'Life Force',
       collectionSlug: 'life-force',
       sizes: ['XS', 'S', 'M', 'L'],
@@ -314,11 +276,7 @@ export const Admin: React.FC = () => {
         care: careArray,
         stock: Number(productForm.stock),
       });
-      showToast({
-        type: 'success',
-        title: 'GARMENT COMMITTED',
-        message: `${productForm.name} updated across storefront.`,
-      });
+      showToast({ type: 'success', title: 'PRODUCT UPDATED', message: `Garment "${productForm.name}" updated.` });
     } else {
       addProduct({
         name: productForm.name,
@@ -340,62 +298,161 @@ export const Admin: React.FC = () => {
         care: careArray,
         stock: Number(productForm.stock),
         isFeatured: true,
-        isNewArrival: true,
       });
-      showToast({
-        type: 'success',
-        title: 'NEW GARMENT PUBLISHED',
-        message: `${productForm.name} is now live across the storefront.`,
-      });
+      showToast({ type: 'success', title: 'PRODUCT ARCHIVED', message: `New piece "${productForm.name}" added to catalog.` });
     }
-
     setIsProductModalOpen(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Remove "${name}" permanently from the archive?`)) {
-      deleteProduct(id);
-      showToast({
-        type: 'info',
-        title: 'GARMENT REMOVED',
-        message: `${name} has been erased from catalog.`,
+  // Category Save Handler
+  const handleSaveCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    const slug = categoryForm.slug.trim() || categoryForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    if (editingCategoryId) {
+      updateCategory(editingCategoryId, {
+        name: categoryForm.name,
+        slug,
+        count: Number(categoryForm.count),
+        image: categoryForm.image,
+        description: categoryForm.description,
+        editorialQuote: categoryForm.editorialQuote,
       });
+      showToast({ type: 'success', title: 'CATEGORY UPDATED', message: `Category "${categoryForm.name}" updated.` });
+    } else {
+      addCategory({
+        name: categoryForm.name,
+        slug,
+        count: Number(categoryForm.count),
+        image: categoryForm.image,
+        description: categoryForm.description,
+        editorialQuote: categoryForm.editorialQuote,
+      });
+      showToast({ type: 'success', title: 'CATEGORY CREATED', message: `Category "${categoryForm.name}" added.` });
     }
+    setIsCategoryModalOpen(false);
   };
 
+  const openAddCategoryModal = () => {
+    setEditingCategoryId(null);
+    setCategoryForm({
+      name: '',
+      slug: '',
+      count: 6,
+      image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1200&q=85',
+      description: 'New architectural tailoring section.',
+      editorialQuote: 'Form follows friction.',
+    });
+    setIsCategoryModalOpen(true);
+  };
+
+  const openEditCategoryModal = (c: Category) => {
+    setEditingCategoryId(c.id);
+    setCategoryForm({
+      name: c.name,
+      slug: c.slug,
+      count: c.count,
+      image: c.image,
+      description: c.description,
+      editorialQuote: c.editorialQuote || '',
+    });
+    setIsCategoryModalOpen(true);
+  };
+
+  // Hero Save Handler
+  const handleSaveHero = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateHero(heroForm);
+    showToast({
+      type: 'success',
+      title: 'HERO SECTION SAVED',
+      message: 'Storefront hero headline, image, and links updated.',
+    });
+  };
+
+  // Gateway Save Handler
   const handleSaveGateways = (e: React.FormEvent) => {
     e.preventDefault();
     updateGateways(gatewaysForm);
     showToast({
       type: 'success',
-      title: 'PAYMENT GATEWAYS SAVED',
-      message: 'Checkout payment credentials updated. Inactive or empty gateways are now hidden.',
+      title: 'GATEWAYS RECONFIGURED',
+      message: 'Live checkout payment APIs updated.',
     });
   };
 
-  const handleSaveGeneralSettings = (e: React.FormEvent) => {
+  // Settings Save Handler
+  const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettings(settingsForm);
     showToast({
       type: 'success',
       title: 'PARAMETERS SAVED',
-      message: 'Storefront parameters committed.',
+      message: 'Store parameters and tracking IDs saved.',
     });
   };
 
-  const allSizes: Size[] = ['XS', 'S', 'M', 'L', 'XL', 'ONE SIZE'];
+  const filteredCustomers = customers.filter(
+    (c) =>
+      c.email.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+      c.firstName.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+      c.lastName.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+      (c.phone && c.phone.includes(customerSearchQuery))
+  );
 
-  // Helper function to check if gateway is active on frontend
-  const isStripeActive = gatewaysForm.stripe.enabled && !!gatewaysForm.stripe.publishableKey.trim();
-  const isPayPalActive = gatewaysForm.paypal.enabled && !!gatewaysForm.paypal.clientId.trim();
-  const isCardsActive = gatewaysForm.directCards.enabled && !!gatewaysForm.directCards.merchantId.trim();
-  const isApplePayActive = gatewaysForm.applePay.enabled && !!gatewaysForm.applePay.merchantIdentifier.trim();
-  const isGooglePayActive = gatewaysForm.googlePay.enabled && !!gatewaysForm.googlePay.merchantId.trim();
-  const isAmazonPayActive = gatewaysForm.amazonPay.enabled && !!gatewaysForm.amazonPay.merchantId.trim();
-  const isBankWireActive = gatewaysForm.bankWire.enabled && !!gatewaysForm.bankWire.iban.trim();
+  const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
+
+  // PASSCODE LOCK SCREEN
+  if (!isAdminAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background pt-36 pb-24 flex items-center justify-center px-4 text-foreground select-none">
+        <div className="w-full max-w-md bg-surface border border-border p-8 md:p-10 space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 bg-foreground text-background flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-mono tracking-[0.25em] text-muted uppercase">
+              CONFIDENTIAL PORTAL
+            </span>
+            <h1 className="text-2xl font-light font-display tracking-widest uppercase text-foreground">
+              ATELIER HOST SUITE
+            </h1>
+            <p className="text-xs font-mono text-muted">
+              Enter host passcode to access products, categories, orders, customers, and payment credentials.
+            </p>
+          </div>
+
+          <form onSubmit={handlePasscodeSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-mono tracking-widest text-muted uppercase block">
+                SECURITY PASSCODE
+              </label>
+              <input
+                type="password"
+                required
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value)}
+                placeholder="ATELIER2026"
+                className={`w-full bg-background border ${
+                  passcodeError ? 'border-red-500' : 'border-border'
+                } p-3.5 text-xs font-mono text-foreground placeholder-muted focus:outline-none focus:border-foreground`}
+              />
+            </div>
+
+            <button
+              type="submit"
+              data-cursor="link"
+              className="w-full py-4 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity font-semibold"
+            >
+              UNLOCK ATELIER SUITE
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background pt-24 md:pt-32 pb-24 text-foreground select-none transition-colors duration-300">
+    <div className="min-h-screen bg-background pt-28 md:pt-36 pb-24 text-foreground select-none transition-colors duration-300">
       <div className="max-w-[1800px] mx-auto px-4 md:px-8 lg:px-12">
         {/* Top Portal Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between pb-8 mb-8 border-b border-border gap-4">
@@ -411,20 +468,20 @@ export const Admin: React.FC = () => {
           </div>
 
           {/* Top Actions & Logout */}
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={openAddModal}
               data-cursor="link"
-              className="px-5 py-2.5 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity flex items-center space-x-2 font-semibold"
+              className="px-4 py-2.5 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity flex items-center space-x-2 font-semibold"
             >
               <Plus className="w-4 h-4" />
-              <span>ADD NEW GARMENT</span>
+              <span>+ GARMENT</span>
             </button>
 
             <Link
-              to="/shop"
+              to="/"
               data-cursor="link"
-              className="px-5 py-2.5 border border-border hover:border-foreground text-foreground font-mono text-xs uppercase tracking-widest transition-colors flex items-center space-x-2"
+              className="px-4 py-2.5 border border-border hover:border-foreground text-foreground font-mono text-xs uppercase tracking-widest transition-colors flex items-center space-x-2"
             >
               <Eye className="w-4 h-4" />
               <span>STOREFRONT</span>
@@ -446,7 +503,7 @@ export const Admin: React.FC = () => {
           <button
             onClick={() => setActiveTab('overview')}
             data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 ${
+            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'bg-foreground text-background border-foreground font-bold'
                 : 'text-muted border-border hover:border-foreground'
@@ -459,53 +516,92 @@ export const Admin: React.FC = () => {
           <button
             onClick={() => setActiveTab('products')}
             data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 ${
+            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
               activeTab === 'products'
                 ? 'bg-foreground text-background border-foreground font-bold'
                 : 'text-muted border-border hover:border-foreground'
             }`}
           >
             <Package className="w-3.5 h-3.5" />
-            <span>GARMENTS ARCHIVE [{products.length}]</span>
+            <span>GARMENTS [{products.length}]</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('categories')}
+            data-cursor="link"
+            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
+              activeTab === 'categories'
+                ? 'bg-foreground text-background border-foreground font-bold'
+                : 'text-muted border-border hover:border-foreground'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>CATEGORIES [{categories.length}]</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('hero')}
+            data-cursor="link"
+            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
+              activeTab === 'hero'
+                ? 'bg-foreground text-background border-foreground font-bold'
+                : 'text-muted border-border hover:border-foreground'
+            }`}
+          >
+            <Layout className="w-3.5 h-3.5" />
+            <span>HERO SECTION</span>
           </button>
 
           <button
             onClick={() => setActiveTab('orders')}
             data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 ${
+            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
               activeTab === 'orders'
                 ? 'bg-foreground text-background border-foreground font-bold'
                 : 'text-muted border-border hover:border-foreground'
             }`}
           >
             <ShoppingBag className="w-3.5 h-3.5" />
-            <span>CUSTOMER ORDERS [{orders.length}]</span>
+            <span>ORDERS [{orders.length}]</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('customers')}
+            data-cursor="link"
+            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
+              activeTab === 'customers'
+                ? 'bg-foreground text-background border-foreground font-bold'
+                : 'text-muted border-border hover:border-foreground'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>CLIENT CRM [{customers.length}]</span>
           </button>
 
           <button
             onClick={() => setActiveTab('gateways')}
             data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 ${
+            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
               activeTab === 'gateways'
                 ? 'bg-foreground text-background border-foreground font-bold'
                 : 'text-muted border-border hover:border-foreground'
             }`}
           >
             <CreditCard className="w-3.5 h-3.5" />
-            <span>PAYMENT GATEWAYS & APIS</span>
+            <span>PAYMENT GATEWAYS</span>
           </button>
 
           <button
             onClick={() => setActiveTab('settings')}
             data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 ${
+            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
               activeTab === 'settings'
                 ? 'bg-foreground text-background border-foreground font-bold'
                 : 'text-muted border-border hover:border-foreground'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            <span>STOREFRONT PARAMETERS</span>
+            <span>STORE & PIXEL</span>
           </button>
         </div>
 
@@ -520,184 +616,148 @@ export const Admin: React.FC = () => {
                 <div className="text-2xl sm:text-3xl font-mono text-foreground font-light">
                   €{totalRevenue.toFixed(2)}
                 </div>
-                <span className="text-[10px] text-emerald-400">
-                  {orders.length} TOTAL CUSTOMER ORDERS
-                </span>
               </div>
 
               <div className="p-6 bg-surface border border-border space-y-2">
                 <span className="text-muted uppercase tracking-widest block">
-                  GARMENTS IN REPERTORY
+                  TOTAL DISPATCHES LOGGED
                 </span>
                 <div className="text-2xl sm:text-3xl font-mono text-foreground font-light">
-                  {products.length}
+                  {orders.length} ORDERS
                 </div>
-                <span className="text-[10px] text-muted">
-                  ACROSS {CATEGORIES.length} CATEGORIES
-                </span>
               </div>
 
               <div className="p-6 bg-surface border border-border space-y-2">
                 <span className="text-muted uppercase tracking-widest block">
-                  AVERAGE ORDER VALUE
+                  ARCHIVAL GARMENTS IN CATALOG
                 </span>
                 <div className="text-2xl sm:text-3xl font-mono text-foreground font-light">
-                  €{averageOrderValue.toFixed(2)}
+                  {products.length} PIECES
                 </div>
-                <span className="text-[10px] text-muted">
-                  {totalUnitsSold} UNITS DISPATCHED
-                </span>
               </div>
 
               <div className="p-6 bg-surface border border-border space-y-2">
                 <span className="text-muted uppercase tracking-widest block">
-                  LOW STOCK ALERTS (&le; 4)
+                  REGISTERED ATELIER CLIENTS
                 </span>
-                <div className="text-2xl sm:text-3xl font-mono text-amber-500 font-light">
-                  {lowStockProducts.length} PIECES
+                <div className="text-2xl sm:text-3xl font-mono text-foreground font-light">
+                  {customers.length} CLIENTS
                 </div>
-                <span className="text-[10px] text-amber-500/80">
-                  REQUIRES ATELIER RUNWAY PRODUCTION
-                </span>
               </div>
             </div>
 
-            {/* Low Stock Watchlist */}
-            {lowStockProducts.length > 0 && (
-              <div className="p-6 bg-surface border border-amber-500/30 space-y-4">
-                <div className="flex items-center space-x-2 text-amber-500 text-xs font-mono uppercase tracking-widest font-semibold">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>URGENT INVENTORY REORDER WATCHLIST</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
-                  {lowStockProducts.map((p) => (
-                    <div key={p.id} className="p-3 bg-background border border-border flex items-center justify-between">
-                      <div className="truncate pr-2">
-                        <span className="text-foreground block truncate font-medium">{p.name}</span>
-                        <span className="text-[10px] text-muted">{p.category}</span>
-                      </div>
-                      <span className="px-2 py-1 bg-amber-950 text-amber-300 font-semibold flex-shrink-0 text-[11px]">
-                        {p.stock} LEFT
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Factory Reset Tool */}
-            <div className="p-6 bg-surface border border-border flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-mono">
+            {/* Quick Actions Card */}
+            <div className="p-6 bg-surface border border-border flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
               <div>
-                <span className="text-foreground font-medium uppercase block">CATALOG RESTORATION</span>
-                <span className="text-muted">Revert all live products back to default factory atelier catalog.</span>
+                <h3 className="font-semibold uppercase tracking-widest text-foreground">
+                  QUICK ATELIER ACTIONS
+                </h3>
+                <p className="text-muted text-[11px] mt-1">
+                  Manage categories, customize hero banner, view customer orders, and configure Facebook Pixel.
+                </p>
               </div>
-              <button
-                onClick={() => {
-                  if (confirm('Reset catalog to original atelier garments? Custom additions will be cleared.')) {
-                    resetProductsToDefault();
-                    showToast({ type: 'info', title: 'CATALOG RESET', message: 'Restored default archive.' });
-                  }
-                }}
-                data-cursor="link"
-                className="px-4 py-2 border border-border hover:border-red-400 text-muted hover:text-red-400 uppercase tracking-widest transition-colors flex items-center space-x-2"
-              >
-                <RefreshCcw className="w-3.5 h-3.5" />
-                <span>RESTORE FACTORY ARCHIVE</span>
-              </button>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => setActiveTab('hero')}
+                  className="px-4 py-2 bg-foreground text-background font-semibold uppercase tracking-widest"
+                >
+                  CUSTOMIZE HERO ↗
+                </button>
+                <button
+                  onClick={() => setActiveTab('categories')}
+                  className="px-4 py-2 border border-border text-foreground hover:border-foreground uppercase tracking-widest"
+                >
+                  MANAGE CATEGORIES ↗
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* TAB 2: PRODUCTS MANAGER */}
+        {/* TAB 2: GARMENTS ARCHIVE (PRODUCTS) */}
         {activeTab === 'products' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center pb-2">
-              <span className="text-xs font-mono text-muted uppercase tracking-widest">
-                DISPLAYING {products.length} PRODUCTS IN ACTIVE REPERTORY
-              </span>
-
-              <button
-                onClick={openAddModal}
-                data-cursor="link"
-                className="px-4 py-2 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity flex items-center space-x-1.5 font-semibold"
-              >
-                <Plus className="w-4 h-4" />
-                <span>ADD GARMENT</span>
-              </button>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+              <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
+                CATALOG GARMENTS [{products.length}]
+              </h2>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={resetProductsToDefault}
+                  data-cursor="link"
+                  className="px-4 py-2 border border-border hover:border-red-400 text-muted hover:text-red-400 font-mono text-xs uppercase tracking-widest transition-colors flex items-center space-x-2"
+                >
+                  <RefreshCcw className="w-3.5 h-3.5" />
+                  <span>RESET TO FACTORY DROP</span>
+                </button>
+                <button
+                  onClick={openAddModal}
+                  data-cursor="link"
+                  className="px-4 py-2 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 font-semibold flex items-center space-x-2"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ NEW PIECE</span>
+                </button>
+              </div>
             </div>
 
-            <div className="border border-border overflow-x-auto bg-surface">
+            <div className="overflow-x-auto border border-border">
               <table className="w-full text-left text-xs font-mono">
-                <thead>
-                  <tr className="border-b border-border bg-surface-subtle text-muted">
-                    <th className="p-3.5">IMAGE</th>
-                    <th className="p-3.5">GARMENT NAME</th>
-                    <th className="p-3.5">CATEGORY</th>
-                    <th className="p-3.5">COLLECTION</th>
-                    <th className="p-3.5">PRICE</th>
-                    <th className="p-3.5">STOCK</th>
-                    <th className="p-3.5">BADGE</th>
-                    <th className="p-3.5 text-right">ACTIONS</th>
+                <thead className="bg-surface-subtle text-muted uppercase tracking-widest border-b border-border">
+                  <tr>
+                    <th className="p-4">IMAGE</th>
+                    <th className="p-4">NAME & SLUG</th>
+                    <th className="p-4">CATEGORY</th>
+                    <th className="p-4">PRICE</th>
+                    <th className="p-4">STOCK</th>
+                    <th className="p-4">BADGE</th>
+                    <th className="p-4 text-right">ACTIONS</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border text-foreground-secondary">
-                  {products.map((prod) => (
-                    <tr key={prod.id} className="hover:bg-surface-subtle transition-colors">
-                      <td className="p-3.5">
-                        <div className="w-12 h-16 bg-background overflow-hidden border border-border">
-                          <img
-                            src={prod.images[0]}
-                            alt={prod.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                <tbody className="divide-y divide-border">
+                  {products.map((p) => (
+                    <tr key={p.id} className="hover:bg-surface transition-colors">
+                      <td className="p-4">
+                        <img
+                          src={p.images[0]}
+                          alt={p.name}
+                          className="w-12 h-16 object-cover border border-border bg-background"
+                        />
                       </td>
-                      <td className="p-3.5 font-medium text-foreground">
-                        <Link to={`/product/${prod.slug}`} className="hover:underline">
-                          {prod.name}
-                        </Link>
-                        <span className="text-[10px] text-muted block font-light">
-                          {prod.sizes.join(', ')}
-                        </span>
+                      <td className="p-4 font-medium text-foreground">
+                        <div>{p.name}</div>
+                        <div className="text-[10px] text-muted font-normal">/{p.slug}</div>
                       </td>
-                      <td className="p-3.5 uppercase">{prod.category}</td>
-                      <td className="p-3.5 uppercase">{prod.collection}</td>
-                      <td className="p-3.5 text-foreground font-semibold">€{prod.price.toFixed(2)}</td>
-                      <td className="p-3.5">
-                        <span className={`px-2 py-0.5 text-[10px] ${
-                          prod.stock <= 4 ? 'bg-red-950 text-red-300' : 'bg-surface-elevated text-foreground'
-                        }`}>
-                          {prod.stock} UNITS
-                        </span>
-                      </td>
-                      <td className="p-3.5">
-                        {prod.badge ? (
-                          <span className="text-[9px] px-1.5 py-0.5 border border-border bg-background text-foreground uppercase">
-                            {prod.badge}
+                      <td className="p-4 text-muted">{p.category}</td>
+                      <td className="p-4 font-semibold text-foreground">€{p.price.toFixed(2)}</td>
+                      <td className="p-4">{p.stock} units</td>
+                      <td className="p-4">
+                        {p.badge ? (
+                          <span className="text-[9px] px-2 py-0.5 bg-surface-subtle text-foreground uppercase border border-border">
+                            {p.badge}
                           </span>
                         ) : (
-                          <span className="text-muted">──</span>
+                          <span className="text-muted">—</span>
                         )}
                       </td>
-                      <td className="p-3.5 text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => openEditModal(prod)}
-                            data-cursor="link"
-                            className="p-1.5 border border-border hover:border-foreground text-muted hover:text-foreground transition-colors"
-                            title="Edit Garment"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(prod.id, prod.name)}
-                            data-cursor="link"
-                            className="p-1.5 border border-border hover:border-red-400 text-muted hover:text-red-400 transition-colors"
-                            title="Delete Garment"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                      <td className="p-4 text-right space-x-2">
+                        <button
+                          onClick={() => openEditModal(p)}
+                          className="p-2 text-muted hover:text-foreground border border-border hover:border-foreground"
+                          title="Edit Piece"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete "${p.name}"?`)) deleteProduct(p.id);
+                          }}
+                          className="p-2 text-muted hover:text-red-400 border border-border hover:border-red-400"
+                          title="Delete Piece"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -707,75 +767,90 @@ export const Admin: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 3: ORDERS MANAGER */}
-        {activeTab === 'orders' && (
+        {/* TAB 3: CATEGORIES CUSTOMIZATION */}
+        {activeTab === 'categories' && (
           <div className="space-y-6">
-            <span className="text-xs font-mono text-muted uppercase tracking-widest block">
-              TOTAL ORDERS RECEIVED: {orders.length}
-            </span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+              <div>
+                <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
+                  TAXONOMY & CATEGORIES DIRECTORY [{categories.length}]
+                </h2>
+                <p className="text-xs text-muted mt-1">
+                  Add, edit, upload cover images, and configure curated sections shown across the shop.
+                </p>
+              </div>
 
-            <div className="space-y-4">
-              {orders.map((ord) => (
-                <div key={ord.id} className="p-6 bg-surface border border-border space-y-4 text-xs font-mono">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-border gap-3">
-                    <div>
-                      <span className="text-sm font-semibold uppercase text-foreground">
-                        ORDER #{ord.orderNumber}
-                      </span>
-                      <span className="text-[10px] text-muted ml-3">
-                        {new Date(ord.createdAt).toLocaleString()}
-                      </span>
-                    </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={resetCategoriesToDefault}
+                  className="px-4 py-2 border border-border text-muted hover:text-red-400 hover:border-red-400 text-xs font-mono uppercase tracking-widest"
+                >
+                  RESET FACTORY CATEGORIES
+                </button>
+                <button
+                  onClick={openAddCategoryModal}
+                  className="px-4 py-2 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 font-semibold flex items-center space-x-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ NEW CATEGORY</span>
+                </button>
+              </div>
+            </div>
 
-                    <div className="flex items-center space-x-3">
-                      <span className="text-muted">STATUS:</span>
-                      <select
-                        value={ord.status}
-                        onChange={(e) => updateOrderStatus(ord.id, e.target.value as Order['status'])}
-                        className="bg-background border border-border px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-foreground uppercase"
-                      >
-                        <option value="pending">PENDING</option>
-                        <option value="preparing">ATELIER PREPARING</option>
-                        <option value="dispatched">DISPATCHED (EN ROUTE)</option>
-                        <option value="delivered">DELIVERED</option>
-                        <option value="cancelled">CANCELLED</option>
-                      </select>
-
-                      <Link
-                        to={`/orders/${ord.id}`}
-                        data-cursor="link"
-                        className="px-3 py-1.5 bg-foreground text-background font-semibold hover:opacity-90 uppercase"
-                      >
-                        VIEW SLIP
-                      </Link>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {categories.map((c) => (
+                <div
+                  key={c.id}
+                  className="bg-surface border border-border flex flex-col justify-between overflow-hidden group"
+                >
+                  <div className="aspect-[16/9] bg-background relative overflow-hidden">
+                    <img
+                      src={c.image}
+                      alt={c.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute top-2 right-2 px-2 py-0.5 bg-background/90 text-foreground font-mono text-[9px] uppercase border border-border">
+                      [{c.count} ITEMS]
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                    <div className="space-y-1 text-foreground-secondary">
-                      <span className="text-foreground font-semibold uppercase block">CLIENT & DESTINATION</span>
-                      <div>{ord.customer.firstName} {ord.customer.lastName}</div>
-                      <div>{ord.customer.address} {ord.customer.apartment && `(${ord.customer.apartment})`}</div>
-                      <div>{ord.customer.postalCode} {ord.customer.city}, {ord.customer.country}</div>
-                      <div>EMAIL: {ord.customer.email} • PHONE: {ord.customer.phone}</div>
-                      <div className="pt-1 text-[11px] text-foreground font-semibold">
-                        TRACKING: {ord.trackingNumber} ({ord.shippingMethod.carrier})
-                      </div>
+                  <div className="p-5 space-y-2 flex-1 flex flex-col justify-between text-xs font-mono">
+                    <div>
+                      <h3 className="font-semibold text-foreground uppercase tracking-wider text-sm">
+                        {c.name}
+                      </h3>
+                      <div className="text-muted text-[11px]">Slug: /{c.slug}</div>
+                      <p className="text-foreground-secondary text-[11px] mt-2 line-clamp-2">
+                        {c.description}
+                      </p>
                     </div>
 
-                    <div className="space-y-1">
-                      <span className="text-foreground font-semibold uppercase block">ORDERED ITEMS & TOTAL</span>
-                      <div className="space-y-1 text-foreground-secondary">
-                        {ord.items.map((it, i) => (
-                          <div key={i} className="flex justify-between">
-                            <span>{it.quantity}x {it.productName} ({it.size})</span>
-                            <span className="text-foreground font-medium">€{(it.price * it.quantity).toFixed(2)}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="pt-2 border-t border-border flex justify-between font-semibold text-foreground">
-                        <span>TOTAL ACQUIRED:</span>
-                        <span>€{ord.total.toFixed(2)}</span>
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
+                      <Link
+                        to={`/categories/${c.slug}`}
+                        className="text-xs text-muted hover:text-foreground underline flex items-center space-x-1"
+                      >
+                        <span>VIEW ON SITE</span>
+                        <ArrowUpRight className="w-3 h-3" />
+                      </Link>
+
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => openEditCategoryModal(c)}
+                          className="p-1.5 border border-border hover:border-foreground text-muted hover:text-foreground"
+                          title="Edit Category"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete category "${c.name}"?`)) deleteCategory(c.id);
+                          }}
+                          className="p-1.5 border border-border hover:border-red-400 text-muted hover:text-red-400"
+                          title="Delete Category"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -785,98 +860,433 @@ export const Admin: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: PAYMENT GATEWAYS CONFIGURATION */}
-        {activeTab === 'gateways' && (
-          <form onSubmit={handleSaveGateways} className="space-y-8 max-w-4xl bg-surface border border-border p-6 md:p-10 text-xs font-mono">
-            <div className="pb-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* TAB 4: HERO SECTION CUSTOMIZER */}
+        {activeTab === 'hero' && (
+          <div className="space-y-8 max-w-4xl">
+            <div className="pb-4 border-b border-border">
+              <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
+                HOME HERO SECTION & BILLBOARD CUSTOMIZER
+              </h2>
+              <p className="text-xs text-muted mt-1">
+                Customize the editorial headline, kicker metadata, description, buttons, and background imagery.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveHero} className="p-6 md:p-8 bg-surface border border-border space-y-6 text-xs font-mono">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-muted uppercase tracking-widest">
+                    SEASON KICKER METADATA
+                  </label>
+                  <input
+                    type="text"
+                    value={heroForm.seasonKicker}
+                    onChange={(e) => setHeroForm((p) => ({ ...p, seasonKicker: e.target.value }))}
+                    className="w-full bg-background border border-border p-3 text-foreground"
+                    placeholder="COLLECTION 2026 // RELEASE 04"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-muted uppercase tracking-widest">
+                    LOCATION / COORDINATES
+                  </label>
+                  <input
+                    type="text"
+                    value={heroForm.kickerSubtitle}
+                    onChange={(e) => setHeroForm((p) => ({ ...p, kickerSubtitle: e.target.value }))}
+                    className="w-full bg-background border border-border p-3 text-foreground"
+                    placeholder="BERLIN // 52.5200° N, 13.4050° E"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-muted uppercase tracking-widest">
+                  EDITORIAL SUBHEADING
+                </label>
+                <input
+                  type="text"
+                  value={heroForm.subheading}
+                  onChange={(e) => setHeroForm((p) => ({ ...p, subheading: e.target.value }))}
+                  className="w-full bg-background border border-border p-3 text-foreground"
+                  placeholder="WHERE ARCHITECTURAL RIGOR MEETS RAW SENSUALITY"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-muted uppercase tracking-widest">
+                    MAIN HEADLINE (PREFIX)
+                  </label>
+                  <input
+                    type="text"
+                    value={heroForm.headingPrefix}
+                    onChange={(e) => setHeroForm((p) => ({ ...p, headingPrefix: e.target.value }))}
+                    className="w-full bg-background border border-border p-3 text-foreground"
+                    placeholder="LIFE"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-muted uppercase tracking-widest">
+                    MAIN HEADLINE (ITALIC HIGHLIGHT)
+                  </label>
+                  <input
+                    type="text"
+                    value={heroForm.headingHighlight}
+                    onChange={(e) => setHeroForm((p) => ({ ...p, headingHighlight: e.target.value }))}
+                    className="w-full bg-background border border-border p-3 text-foreground"
+                    placeholder="FORCE"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-muted uppercase tracking-widest">
+                  EDITORIAL HERO DESCRIPTION
+                </label>
+                <textarea
+                  rows={3}
+                  value={heroForm.description}
+                  onChange={(e) => setHeroForm((p) => ({ ...p, description: e.target.value }))}
+                  className="w-full bg-background border border-border p-3 text-foreground"
+                />
+              </div>
+
+              {/* Image Input & Upload */}
+              <div className="space-y-2">
+                <label className="text-[10px] text-muted uppercase tracking-widest block">
+                  HERO BACKGROUND IMAGE (URL OR DIRECT UPLOAD)
+                </label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={heroForm.imageUrl}
+                    onChange={(e) => setHeroForm((p) => ({ ...p, imageUrl: e.target.value }))}
+                    className="flex-1 bg-background border border-border p-3 text-foreground"
+                    placeholder="https://images.unsplash.com/..."
+                  />
+                  <label className="px-4 py-3 bg-surface border border-border hover:border-foreground text-foreground flex items-center justify-center space-x-2 cursor-pointer transition-colors">
+                    <Upload className="w-4 h-4" />
+                    <span>UPLOAD FILE</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e, 'hero')}
+                    />
+                  </label>
+                </div>
+                {heroForm.imageUrl && (
+                  <div className="aspect-[21/9] max-h-48 border border-border overflow-hidden bg-background mt-2">
+                    <img
+                      src={heroForm.imageUrl}
+                      alt="Hero Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-muted uppercase tracking-widest">
+                    PRIMARY BUTTON TEXT & LINK
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={heroForm.primaryButtonText}
+                      onChange={(e) => setHeroForm((p) => ({ ...p, primaryButtonText: e.target.value }))}
+                      className="bg-background border border-border p-3 text-foreground"
+                      placeholder="SEE COLLECTION"
+                    />
+                    <input
+                      type="text"
+                      value={heroForm.primaryButtonLink}
+                      onChange={(e) => setHeroForm((p) => ({ ...p, primaryButtonLink: e.target.value }))}
+                      className="bg-background border border-border p-3 text-foreground"
+                      placeholder="/shop"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-muted uppercase tracking-widest">
+                    SECONDARY BUTTON TEXT & LINK
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={heroForm.secondaryButtonText}
+                      onChange={(e) => setHeroForm((p) => ({ ...p, secondaryButtonText: e.target.value }))}
+                      className="bg-background border border-border p-3 text-foreground"
+                      placeholder="BE YOURSELF"
+                    />
+                    <input
+                      type="text"
+                      value={heroForm.secondaryButtonLink}
+                      onChange={(e) => setHeroForm((p) => ({ ...p, secondaryButtonLink: e.target.value }))}
+                      className="bg-background border border-border p-3 text-foreground"
+                      placeholder="/campaign"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="px-8 py-4 bg-foreground text-background font-mono text-xs uppercase tracking-widest font-semibold hover:opacity-90"
+              >
+                SAVE & PUBLISH HERO
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 5: ORDERS LOG */}
+        {activeTab === 'orders' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center pb-4 border-b border-border">
+              <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
+                DISPATCH & ACQUISITION LOG [{orders.length}]
+              </h2>
+            </div>
+
+            <div className="overflow-x-auto border border-border">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-surface-subtle text-muted uppercase tracking-widest border-b border-border">
+                  <tr>
+                    <th className="p-4">ORDER #</th>
+                    <th className="p-4">CLIENT</th>
+                    <th className="p-4">ITEMS</th>
+                    <th className="p-4">TOTAL</th>
+                    <th className="p-4">PAYMENT</th>
+                    <th className="p-4">STATUS</th>
+                    <th className="p-4 text-right">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {orders.map((o) => (
+                    <tr key={o.id} className="hover:bg-surface transition-colors">
+                      <td className="p-4 font-semibold text-foreground">
+                        <div>#{o.orderNumber}</div>
+                        <div className="text-[10px] text-muted font-normal">
+                          {new Date(o.createdAt).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-foreground">
+                          {o.customer.firstName} {o.customer.lastName}
+                        </div>
+                        <div className="text-[10px] text-muted">{o.customer.email}</div>
+                      </td>
+                      <td className="p-4 text-muted">{o.items.length} items</td>
+                      <td className="p-4 font-semibold text-foreground">€{o.total.toFixed(2)}</td>
+                      <td className="p-4 text-muted">{o.paymentMethod}</td>
+                      <td className="p-4">
+                        <select
+                          value={o.status}
+                          onChange={(e) => updateOrderStatus(o.id, e.target.value as Order['status'])}
+                          className="bg-background border border-border p-1.5 text-xs text-foreground uppercase"
+                        >
+                          <option value="pending">PENDING</option>
+                          <option value="processing">PROCESSING</option>
+                          <option value="dispatched">DISPATCHED</option>
+                          <option value="delivered">DELIVERED</option>
+                          <option value="cancelled">CANCELLED</option>
+                        </select>
+                      </td>
+                      <td className="p-4 text-right">
+                        <Link
+                          to={`/orders/${o.id}`}
+                          className="px-3 py-1.5 border border-border hover:border-foreground text-foreground uppercase inline-block"
+                        >
+                          INSPECT
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: CUSTOMER CRM */}
+        {activeTab === 'customers' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
               <div>
-                <span className="text-[10px] font-mono tracking-widest text-muted uppercase block mb-1">
-                  API CREDENTIALS & LIVE ACTIVATION
-                </span>
-                <h2 className="text-lg font-light font-display uppercase tracking-widest text-foreground">
-                  PAYMENT GATEWAYS CONFIGURATION
+                <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
+                  REGISTERED ATELIER CLIENTS & CRM [{customers.length}]
                 </h2>
-                <p className="text-xs text-muted font-normal mt-1 leading-relaxed">
-                  Enter your credentials below. Any payment gateway left empty or unchecked will <strong className="text-foreground">automatically disappear</strong> from the customer checkout.
+                <p className="text-xs text-muted mt-1">
+                  Manage accounts, review delivery coordinates, and examine order history per client.
                 </p>
               </div>
 
-              <Link
-                to="/checkout"
-                target="_blank"
-                className="px-4 py-2 bg-surface-subtle hover:bg-foreground hover:text-background border border-border text-foreground uppercase tracking-wider flex items-center space-x-1.5 self-start sm:self-auto flex-shrink-0"
-              >
-                <span>PREVIEW CHECKOUT</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
+              <input
+                type="text"
+                value={customerSearchQuery}
+                onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                placeholder="SEARCH CLIENTS BY NAME, EMAIL, PHONE..."
+                className="w-full sm:w-80 bg-surface border border-border p-2.5 text-xs font-mono text-foreground placeholder-muted"
+              />
             </div>
 
-            {/* 1. STRIPE */}
-            <div className="p-6 bg-background border border-border space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-border">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-semibold uppercase text-foreground">01 / STRIPE</span>
-                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
-                    isStripeActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
-                  }`}>
-                    {isStripeActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
-                  </span>
-                </div>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={gatewaysForm.stripe.enabled}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, stripe: { ...p.stripe, enabled: e.target.checked } }))}
-                    className="w-4 h-4 accent-foreground"
-                  />
-                  <span className="text-xs uppercase">{gatewaysForm.stripe.enabled ? 'ENABLED' : 'DISABLED'}</span>
-                </label>
+            <div className="overflow-x-auto border border-border">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-surface-subtle text-muted uppercase tracking-widest border-b border-border">
+                  <tr>
+                    <th className="p-4">CLIENT NAME</th>
+                    <th className="p-4">EMAIL</th>
+                    <th className="p-4">PHONE</th>
+                    <th className="p-4">REGISTRATION DATE</th>
+                    <th className="p-4">SAVED ADDRESSES</th>
+                    <th className="p-4 text-right">ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredCustomers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-muted uppercase">
+                        NO CLIENT PROFILES MATCHING SEARCH QUERY
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredCustomers.map((c) => (
+                      <tr key={c.id} className="hover:bg-surface transition-colors">
+                        <td className="p-4 font-medium text-foreground">
+                          <div className="flex items-center space-x-2">
+                            <span>{c.firstName} {c.lastName}</span>
+                            {c.isGmailAuth && (
+                              <span className="text-[8px] px-1 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800">
+                                GOOGLE
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4 text-muted">{c.email}</td>
+                        <td className="p-4 text-muted">{c.phone || '—'}</td>
+                        <td className="p-4 text-muted">
+                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="p-4 text-muted">
+                          {(c.addresses || []).length > 0 ? (
+                            <span>{c.addresses![0].address}, {c.addresses![0].city}</span>
+                          ) : (
+                            <span>No address saved</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-right space-x-2">
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Delete client record for ${c.email}?`)) {
+                                deleteCustomer(c.id);
+                                showToast({ type: 'success', title: 'CLIENT REMOVED', message: 'Client profile deleted.' });
+                              }
+                            }}
+                            className="p-1.5 border border-border hover:border-red-400 text-muted hover:text-red-400"
+                            title="Delete Client Profile"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: PAYMENT GATEWAYS CONFIG */}
+        {activeTab === 'gateways' && (
+          <form onSubmit={handleSaveGateways} className="space-y-8 max-w-4xl font-mono text-xs">
+            <div className="pb-4 border-b border-border flex justify-between items-center">
+              <div>
+                <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
+                  PAYMENT GATEWAYS CREDENTIALS & APIS
+                </h2>
+                <p className="text-xs text-muted mt-1">
+                  Configure live production keys. Leaving a credential blank automatically hides that gateway from the customer checkout.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                className="px-6 py-3 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90"
+              >
+                SAVE API CREDENTIALS
+              </button>
+            </div>
+
+            {/* STRIPE */}
+            <div className="p-6 bg-surface border border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground uppercase tracking-wider text-sm flex items-center space-x-2">
+                  <CreditCard className="w-4 h-4" />
+                  <span>STRIPE VAULT (CARDS)</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={gatewaysForm.stripe.enabled}
+                  onChange={(e) =>
+                    setGatewaysForm((p) => ({ ...p, stripe: { ...p.stripe, enabled: e.target.checked } }))
+                  }
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">PUBLISHABLE KEY (PK_LIVE_...)</label>
+                  <label className="text-[10px] text-muted uppercase">STRIPE PUBLISHABLE KEY</label>
                   <input
                     type="text"
                     value={gatewaysForm.stripe.publishableKey}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, stripe: { ...p.stripe, publishableKey: e.target.value } }))}
+                    onChange={(e) =>
+                      setGatewaysForm((p) => ({
+                        ...p,
+                        stripe: { ...p.stripe, publishableKey: e.target.value },
+                      }))
+                    }
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
                     placeholder="pk_live_..."
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">SECRET KEY (SK_LIVE_...)</label>
+                  <label className="text-[10px] text-muted uppercase">STRIPE SECRET KEY</label>
                   <input
                     type="password"
                     value={gatewaysForm.stripe.secretKey}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, stripe: { ...p.stripe, secretKey: e.target.value } }))}
+                    onChange={(e) =>
+                      setGatewaysForm((p) => ({
+                        ...p,
+                        stripe: { ...p.stripe, secretKey: e.target.value },
+                      }))
+                    }
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
                     placeholder="sk_live_..."
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
                   />
                 </div>
               </div>
             </div>
 
-            {/* 2. PAYPAL */}
-            <div className="p-6 bg-background border border-border space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-border">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-semibold uppercase text-foreground">02 / PAYPAL EXPRESS</span>
-                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
-                    isPayPalActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
-                  }`}>
-                    {isPayPalActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
-                  </span>
-                </div>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={gatewaysForm.paypal.enabled}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, paypal: { ...p.paypal, enabled: e.target.checked } }))}
-                    className="w-4 h-4 accent-foreground"
-                  />
-                  <span className="text-xs uppercase">{gatewaysForm.paypal.enabled ? 'ENABLED' : 'DISABLED'}</span>
-                </label>
+            {/* PAYPAL */}
+            <div className="p-6 bg-surface border border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground uppercase tracking-wider text-sm">
+                  PAYPAL COMMERCE
+                </span>
+                <input
+                  type="checkbox"
+                  checked={gatewaysForm.paypal.enabled}
+                  onChange={(e) =>
+                    setGatewaysForm((p) => ({ ...p, paypal: { ...p.paypal, enabled: e.target.checked } }))
+                  }
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -885,9 +1295,14 @@ export const Admin: React.FC = () => {
                   <input
                     type="text"
                     value={gatewaysForm.paypal.clientId}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, paypal: { ...p.paypal, clientId: e.target.value } }))}
-                    placeholder="CLIENT_ID"
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
+                    onChange={(e) =>
+                      setGatewaysForm((p) => ({
+                        ...p,
+                        paypal: { ...p.paypal, clientId: e.target.value },
+                      }))
+                    }
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                    placeholder="AYv..."
                   />
                 </div>
                 <div className="space-y-1">
@@ -895,206 +1310,32 @@ export const Admin: React.FC = () => {
                   <input
                     type="password"
                     value={gatewaysForm.paypal.clientSecret}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, paypal: { ...p.paypal, clientSecret: e.target.value } }))}
-                    placeholder="SECRET"
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
+                    onChange={(e) =>
+                      setGatewaysForm((p) => ({
+                        ...p,
+                        paypal: { ...p.paypal, clientSecret: e.target.value },
+                      }))
+                    }
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                    placeholder="EP..."
                   />
                 </div>
               </div>
             </div>
 
-            {/* 3. DIRECT CREDIT / DEBIT CARDS */}
-            <div className="p-6 bg-background border border-border space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-border">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-semibold uppercase text-foreground">03 / DIRECT MERCHANT CARDS</span>
-                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
-                    isCardsActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
-                  }`}>
-                    {isCardsActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
-                  </span>
-                </div>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={gatewaysForm.directCards.enabled}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, directCards: { ...p.directCards, enabled: e.target.checked } }))}
-                    className="w-4 h-4 accent-foreground"
-                  />
-                  <span className="text-xs uppercase">{gatewaysForm.directCards.enabled ? 'ENABLED' : 'DISABLED'}</span>
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">MERCHANT ID</label>
-                  <input
-                    type="text"
-                    value={gatewaysForm.directCards.merchantId}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, directCards: { ...p.directCards, merchantId: e.target.value } }))}
-                    placeholder="MCH-..."
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">GATEWAY KEY</label>
-                  <input
-                    type="password"
-                    value={gatewaysForm.directCards.gatewayKey}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, directCards: { ...p.directCards, gatewayKey: e.target.value } }))}
-                    placeholder="GW-KEY-..."
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 4. APPLE PAY */}
-            <div className="p-6 bg-background border border-border space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-border">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-semibold uppercase text-foreground">04 / APPLE PAY</span>
-                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
-                    isApplePayActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
-                  }`}>
-                    {isApplePayActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
-                  </span>
-                </div>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={gatewaysForm.applePay.enabled}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, applePay: { ...p.applePay, enabled: e.target.checked } }))}
-                    className="w-4 h-4 accent-foreground"
-                  />
-                  <span className="text-xs uppercase">{gatewaysForm.applePay.enabled ? 'ENABLED' : 'DISABLED'}</span>
-                </label>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] text-muted uppercase">APPLE MERCHANT IDENTIFIER</label>
+            {/* BANK WIRE */}
+            <div className="p-6 bg-surface border border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground uppercase tracking-wider text-sm">
+                  DIRECT SEPA / WIRE TRANSFER
+                </span>
                 <input
-                  type="text"
-                  value={gatewaysForm.applePay.merchantIdentifier}
-                  onChange={(e) => setGatewaysForm((p) => ({ ...p, applePay: { ...p.applePay, merchantIdentifier: e.target.value } }))}
-                  placeholder="merchant.com.yourdomain"
-                  className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
+                  type="checkbox"
+                  checked={gatewaysForm.bankWire.enabled}
+                  onChange={(e) =>
+                    setGatewaysForm((p) => ({ ...p, bankWire: { ...p.bankWire, enabled: e.target.checked } }))
+                  }
                 />
-              </div>
-            </div>
-
-            {/* 5. GOOGLE PAY */}
-            <div className="p-6 bg-background border border-border space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-border">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-semibold uppercase text-foreground">05 / GOOGLE PAY</span>
-                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
-                    isGooglePayActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
-                  }`}>
-                    {isGooglePayActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
-                  </span>
-                </div>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={gatewaysForm.googlePay.enabled}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, googlePay: { ...p.googlePay, enabled: e.target.checked } }))}
-                    className="w-4 h-4 accent-foreground"
-                  />
-                  <span className="text-xs uppercase">{gatewaysForm.googlePay.enabled ? 'ENABLED' : 'DISABLED'}</span>
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">GOOGLE MERCHANT ID</label>
-                  <input
-                    type="text"
-                    value={gatewaysForm.googlePay.merchantId}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, googlePay: { ...p.googlePay, merchantId: e.target.value } }))}
-                    placeholder="GPAY-MERCHANT-..."
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">GATEWAY ID</label>
-                  <input
-                    type="text"
-                    value={gatewaysForm.googlePay.gatewayId}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, googlePay: { ...p.googlePay, gatewayId: e.target.value } }))}
-                    placeholder="gateway-id"
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 6. AMAZON PAY */}
-            <div className="p-6 bg-background border border-border space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-border">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-semibold uppercase text-foreground">06 / AMAZON PAY</span>
-                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
-                    isAmazonPayActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
-                  }`}>
-                    {isAmazonPayActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
-                  </span>
-                </div>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={gatewaysForm.amazonPay.enabled}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, amazonPay: { ...p.amazonPay, enabled: e.target.checked } }))}
-                    className="w-4 h-4 accent-foreground"
-                  />
-                  <span className="text-xs uppercase">{gatewaysForm.amazonPay.enabled ? 'ENABLED' : 'DISABLED'}</span>
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">AMAZON MERCHANT ID</label>
-                  <input
-                    type="text"
-                    value={gatewaysForm.amazonPay.merchantId}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, amazonPay: { ...p.amazonPay, merchantId: e.target.value } }))}
-                    placeholder="AMZN-MERCHANT-..."
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">PUBLIC KEY ID</label>
-                  <input
-                    type="text"
-                    value={gatewaysForm.amazonPay.publicKeyId}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, amazonPay: { ...p.amazonPay, publicKeyId: e.target.value } }))}
-                    placeholder="SANDBOX-OR-LIVE-KEY-ID"
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 7. BANK WIRE / SEPA */}
-            <div className="p-6 bg-background border border-border space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-border">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-semibold uppercase text-foreground">07 / SEPA BANK WIRE</span>
-                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
-                    isBankWireActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
-                  }`}>
-                    {isBankWireActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
-                  </span>
-                </div>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={gatewaysForm.bankWire.enabled}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, bankWire: { ...p.bankWire, enabled: e.target.checked } }))}
-                    className="w-4 h-4 accent-foreground"
-                  />
-                  <span className="text-xs uppercase">{gatewaysForm.bankWire.enabled ? 'ENABLED' : 'DISABLED'}</span>
-                </label>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1103,9 +1344,13 @@ export const Admin: React.FC = () => {
                   <input
                     type="text"
                     value={gatewaysForm.bankWire.iban}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, bankWire: { ...p.bankWire, iban: e.target.value } }))}
-                    placeholder="DE89 ..."
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
+                    onChange={(e) =>
+                      setGatewaysForm((p) => ({
+                        ...p,
+                        bankWire: { ...p.bankWire, iban: e.target.value },
+                      }))
+                    }
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
                   />
                 </div>
                 <div className="space-y-1">
@@ -1113,130 +1358,157 @@ export const Admin: React.FC = () => {
                   <input
                     type="text"
                     value={gatewaysForm.bankWire.bic}
-                    onChange={(e) => setGatewaysForm((p) => ({ ...p, bankWire: { ...p.bankWire, bic: e.target.value } }))}
-                    placeholder="DBEUTDDBXXX"
-                    className="w-full bg-surface border border-border p-2.5 text-foreground focus:outline-none focus:border-foreground"
+                    onChange={(e) =>
+                      setGatewaysForm((p) => ({
+                        ...p,
+                        bankWire: { ...p.bankWire, bic: e.target.value },
+                      }))
+                    }
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
                   />
                 </div>
               </div>
             </div>
-
-            <button
-              type="submit"
-              data-cursor="link"
-              className="px-8 py-4 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity font-semibold"
-            >
-              SAVE PAYMENT GATEWAYS CONFIGURATION
-            </button>
           </form>
         )}
 
-        {/* TAB 5: STOREFRONT PARAMETERS */}
+        {/* TAB 8: STORE PARAMETERS & FACEBOOK PIXEL */}
         {activeTab === 'settings' && (
-          <form onSubmit={handleSaveGeneralSettings} className="max-w-3xl space-y-6 bg-surface border border-border p-8 text-xs font-mono">
-            <h2 className="text-sm tracking-widest uppercase text-foreground pb-3 border-b border-border">
-              STOREFRONT CONFIGURATION
-            </h2>
+          <form onSubmit={handleSaveSettings} className="space-y-8 max-w-3xl font-mono text-xs">
+            <div className="pb-4 border-b border-border flex justify-between items-center">
+              <div>
+                <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
+                  STORE PARAMETERS & TRACKING APIS
+                </h2>
+                <p className="text-xs text-muted mt-1">
+                  Configure top announcement banner, discount vouchers, Facebook Pixel ID, and Google Client ID.
+                </p>
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-muted uppercase block">
-                TOP ANNOUNCEMENT MARQUEE / TICKER TEXT
-              </label>
-              <input
-                type="text"
-                value={settingsForm.announcementText}
-                onChange={(e) => setSettingsForm((p) => ({ ...p, announcementText: e.target.value }))}
-                className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground"
-              />
+              <button
+                type="submit"
+                className="px-6 py-3 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90"
+              >
+                SAVE PARAMETERS
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-muted uppercase block">
-                  FREE SHIPPING THRESHOLD (€)
-                </label>
-                <input
-                  type="number"
-                  value={settingsForm.freeShippingThreshold}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, freeShippingThreshold: Number(e.target.value) }))}
-                  className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground"
-                />
+            {/* FACEBOOK PIXEL CONFIGURATION */}
+            <div className="p-6 bg-surface border border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground uppercase tracking-wider text-sm flex items-center space-x-2">
+                  <Share2 className="w-4 h-4 text-blue-400" />
+                  <span>META / FACEBOOK PIXEL INTEGRATION</span>
+                </span>
+                {settingsForm.facebookPixelId ? (
+                  <span className="text-[9px] px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    ● ACTIVE PIXEL TRACKER
+                  </span>
+                ) : (
+                  <span className="text-[9px] px-2 py-0.5 bg-surface-subtle text-muted border border-border">
+                    ○ UNCONNECTED
+                  </span>
+                )}
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-[10px] text-muted uppercase block">
-                  DISCOUNT VOUCHER CODE
+                  FACEBOOK PIXEL ID
                 </label>
                 <input
                   type="text"
-                  value={settingsForm.discountCode}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, discountCode: e.target.value.toUpperCase() }))}
-                  className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground uppercase"
+                  value={settingsForm.facebookPixelId}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, facebookPixelId: e.target.value }))}
+                  placeholder="E.G. 123456789012345"
+                  className="w-full bg-background border border-border p-3 text-foreground"
                 />
+                <p className="text-[10px] text-muted">
+                  Automatically tracks PageView, ViewContent, AddToCart, InitiateCheckout, and Purchase events across every route.
+                </p>
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] text-muted uppercase block">
-                DISCOUNT PERCENTAGE (%)
-              </label>
-              <input
-                type="number"
-                value={settingsForm.discountPercentage}
-                onChange={(e) => setSettingsForm((p) => ({ ...p, discountPercentage: Number(e.target.value) }))}
-                className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground"
-              />
-            </div>
-
-            <div className="space-y-1.5 pt-2 border-t border-border">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] text-foreground font-semibold uppercase block">
-                  OFFICIAL GOOGLE OAUTH CLIENT ID (FOR REAL GMAIL SIGN-IN)
-                </label>
-                <a
-                  href="https://console.cloud.google.com/apis/credentials"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[10px] text-muted hover:text-foreground underline uppercase"
-                >
-                  GET FREE KEY ON GOOGLE CLOUD ↗
-                </a>
-              </div>
+            {/* GOOGLE CLIENT ID */}
+            <div className="p-6 bg-surface border border-border space-y-4">
+              <span className="font-semibold text-foreground uppercase tracking-wider text-sm block">
+                GOOGLE OAUTH CLIENT ID
+              </span>
               <input
                 type="text"
-                value={settingsForm.googleClientId || ''}
+                value={settingsForm.googleClientId}
                 onChange={(e) => setSettingsForm((p) => ({ ...p, googleClientId: e.target.value }))}
-                placeholder="YOUR_CLIENT_ID.apps.googleusercontent.com"
-                className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground font-mono text-xs"
+                placeholder="1234567890-abcdef.apps.googleusercontent.com"
+                className="w-full bg-background border border-border p-3 text-foreground"
               />
-              <span className="text-[10px] text-muted block leading-relaxed">
-                Add <code>http://localhost:5173</code> under "Authorized JavaScript origins" in your Google Cloud Console project. When populated, customer accounts will open the real Google authentication popup window.
-              </span>
             </div>
 
-            <button
-              type="submit"
-              data-cursor="link"
-              className="px-8 py-3.5 bg-foreground text-background uppercase tracking-widest hover:opacity-90 transition-opacity font-semibold"
-            >
-              SAVE STORE PARAMETERS
-            </button>
+            {/* STORE CONFIG */}
+            <div className="p-6 bg-surface border border-border space-y-4">
+              <span className="font-semibold text-foreground uppercase tracking-wider text-sm block">
+                GENERAL STOREFRONT CONFIG
+              </span>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-muted uppercase block">
+                  TOP MARQUEE ANNOUNCEMENT
+                </label>
+                <input
+                  type="text"
+                  value={settingsForm.announcementText}
+                  onChange={(e) => setSettingsForm((p) => ({ ...p, announcementText: e.target.value }))}
+                  className="w-full bg-background border border-border p-3 text-foreground"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-muted uppercase block">
+                    FREE DISPATCH THRESHOLD (€)
+                  </label>
+                  <input
+                    type="number"
+                    value={settingsForm.freeShippingThreshold}
+                    onChange={(e) =>
+                      setSettingsForm((p) => ({ ...p, freeShippingThreshold: Number(e.target.value) }))
+                    }
+                    className="w-full bg-background border border-border p-3 text-foreground"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-muted uppercase block">
+                    VOUCHER CODE & DISCOUNT %
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={settingsForm.discountCode}
+                      onChange={(e) => setSettingsForm((p) => ({ ...p, discountCode: e.target.value }))}
+                      className="bg-background border border-border p-3 text-foreground"
+                    />
+                    <input
+                      type="number"
+                      value={settingsForm.discountPercentage}
+                      onChange={(e) =>
+                        setSettingsForm((p) => ({ ...p, discountPercentage: Number(e.target.value) }))
+                      }
+                      className="bg-background border border-border p-3 text-foreground"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </form>
         )}
 
-        {/* MODAL: ADD / EDIT GARMENT WITH DIRECT IMAGE UPLOAD */}
+        {/* MODAL: ADD / EDIT PRODUCT */}
         {isProductModalOpen && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 md:p-8">
-            <div
-              className="fixed inset-0 bg-black/85 backdrop-blur-md"
-              onClick={() => setIsProductModalOpen(false)}
-            />
-
-            <div className="relative w-full max-w-3xl bg-surface border border-border p-6 md:p-10 z-10 text-foreground max-h-[90vh] overflow-y-auto shadow-2xl">
-              <div className="flex justify-between items-center pb-4 mb-6 border-b border-border">
-                <h2 className="text-lg font-mono uppercase tracking-widest text-foreground font-semibold">
-                  {editingProductId ? 'EDIT GARMENT ATTRIBUTES' : 'REGISTER NEW ATELIER PIECE'}
-                </h2>
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none">
+            <div className="relative w-full max-w-2xl bg-surface border border-border p-6 md:p-8 max-h-[90vh] overflow-y-auto space-y-6 text-xs font-mono text-foreground">
+              <div className="flex justify-between items-center pb-4 border-b border-border">
+                <h3 className="font-semibold text-foreground uppercase tracking-widest text-sm">
+                  {editingProductId ? 'EDIT ARCHIVAL PIECE' : 'ADD NEW GARMENT TO CATALOG'}
+                </h3>
                 <button
                   onClick={() => setIsProductModalOpen(false)}
                   className="text-muted hover:text-foreground p-1"
@@ -1245,139 +1517,126 @@ export const Admin: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleSaveProduct} className="space-y-6 text-xs font-mono">
+              <form onSubmit={handleSaveProduct} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-muted uppercase block">GARMENT NAME *</label>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted uppercase">GARMENT NAME *</label>
                     <input
                       type="text"
                       required
                       value={productForm.name}
                       onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value }))}
-                      placeholder="E.G. DECONSTRUCTED CORSET TOP"
-                      className="w-full bg-background border border-border p-3 text-foreground uppercase focus:outline-none focus:border-foreground"
+                      className="w-full bg-background border border-border p-2.5 text-foreground"
+                      placeholder="ASYMMETRIC SILK Viscose GOWN"
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-muted uppercase block">PRICE (€) *</label>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted uppercase">PRICE (€) *</label>
                     <input
                       type="number"
                       required
                       value={productForm.price}
                       onChange={(e) => setProductForm((p) => ({ ...p, price: Number(e.target.value) }))}
-                      className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground"
+                      className="w-full bg-background border border-border p-2.5 text-foreground"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-muted uppercase block">CATEGORY</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted uppercase">CATEGORY</label>
                     <select
                       value={productForm.categorySlug}
                       onChange={(e) => {
-                        const matchedCat = CATEGORIES.find((c) => c.slug === e.target.value);
+                        const matched = categories.find((c) => c.slug === e.target.value);
                         setProductForm((p) => ({
                           ...p,
                           categorySlug: e.target.value,
-                          category: matchedCat ? matchedCat.name : e.target.value,
+                          category: matched?.name || e.target.value,
                         }));
                       }}
-                      className="w-full bg-background border border-border p-3 text-foreground uppercase focus:outline-none focus:border-foreground"
+                      className="w-full bg-background border border-border p-2.5 text-foreground"
                     >
-                      {CATEGORIES.map((c) => (
-                        <option key={c.slug} value={c.slug}>{c.name}</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.slug}>
+                          {c.name}
+                        </option>
                       ))}
                     </select>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-muted uppercase block">COLLECTION</label>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted uppercase">EDITORIAL BADGE</label>
                     <select
-                      value={productForm.collectionSlug}
-                      onChange={(e) => {
-                        const matchedCol = COLLECTIONS.find((c) => c.slug === e.target.value);
+                      value={productForm.badge || ''}
+                      onChange={(e) =>
                         setProductForm((p) => ({
                           ...p,
-                          collectionSlug: e.target.value,
-                          collection: matchedCol ? matchedCol.name : e.target.value,
-                        }));
-                      }}
-                      className="w-full bg-background border border-border p-3 text-foreground uppercase focus:outline-none focus:border-foreground"
+                          badge: e.target.value ? (e.target.value as any) : undefined,
+                        }))
+                      }
+                      className="w-full bg-background border border-border p-2.5 text-foreground"
                     >
-                      {COLLECTIONS.map((col) => (
-                        <option key={col.slug} value={col.slug}>{col.name}</option>
-                      ))}
+                      <option value="">None</option>
+                      <option value="NEW DROP">NEW DROP</option>
+                      <option value="BEST SELLER">BEST SELLER</option>
+                      <option value="RUNWAY">RUNWAY</option>
+                      <option value="SPECIAL EDITION">SPECIAL EDITION</option>
+                      <option value="ARCHIVE">ARCHIVE</option>
                     </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-muted uppercase block">STOCK IN ATELIER</label>
-                    <input
-                      type="number"
-                      required
-                      value={productForm.stock}
-                      onChange={(e) => setProductForm((p) => ({ ...p, stock: Number(e.target.value) }))}
-                      className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground"
-                    />
                   </div>
                 </div>
 
-                {/* Direct File Image Upload & Gallery */}
-                <div className="space-y-3 p-4 bg-background border border-border">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-foreground font-semibold uppercase block">
-                      GARMENT PHOTOGRAPHY & GALLERY [{productForm.images.length} IMAGES]
-                    </label>
-                  </div>
-
-                  {/* Drag and drop upload zone */}
-                  <label className="border border-dashed border-border hover:border-foreground p-4 flex flex-col items-center justify-center cursor-pointer transition-colors text-center bg-surface-subtle">
-                    <Upload className="w-5 h-5 text-muted mb-1" />
-                    <span className="text-xs text-foreground font-medium uppercase">
-                      UPLOAD IMAGE FILES FROM DEVICE
-                    </span>
-                    <span className="text-[10px] text-muted mt-0.5">
-                      Accepts PNG, JPG, WEBP. Drag & Drop or Click.
-                    </span>
+                {/* Image Upload & Management */}
+                <div className="space-y-2">
+                  <label className="text-[10px] text-muted uppercase block">GARMENT IMAGES</label>
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                  </label>
-
-                  {/* Manual URL entry */}
-                  <div className="flex space-x-2 pt-2">
-                    <input
-                      type="url"
-                      value={singleImageUrlInput}
-                      onChange={(e) => setSingleImageUrlInput(e.target.value)}
-                      placeholder="OR PASTE DIRECT IMAGE URL..."
-                      className="flex-1 bg-surface border border-border px-3 py-2 text-[11px] text-foreground placeholder-muted focus:outline-none focus:border-foreground"
+                      type="text"
+                      value={tempImageUrl}
+                      onChange={(e) => setTempImageUrl(e.target.value)}
+                      placeholder="PASTE IMAGE URL (HTTPS://...)"
+                      className="flex-1 bg-background border border-border p-2.5 text-foreground"
                     />
                     <button
                       type="button"
-                      onClick={handleAddImageUrl}
-                      className="px-3 py-2 bg-surface-elevated hover:bg-foreground hover:text-background border border-border text-xs uppercase"
+                      onClick={() => {
+                        if (tempImageUrl.trim()) {
+                          setProductForm((p) => ({ ...p, images: [...p.images, tempImageUrl.trim()] }));
+                          setTempImageUrl('');
+                        }
+                      }}
+                      className="px-4 py-2.5 bg-foreground text-background font-semibold uppercase"
                     >
-                      ATTACH
+                      ADD URL
                     </button>
+                    <label className="px-4 py-2.5 bg-surface border border-border hover:border-foreground text-foreground flex items-center justify-center space-x-1 cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>UPLOAD</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, 'product')}
+                      />
+                    </label>
                   </div>
 
-                  {/* Image Previews List */}
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-2">
-                    {productForm.images.map((img, i) => (
-                      <div key={i} className="relative aspect-[3/4] bg-surface border border-border group overflow-hidden">
-                        <img src={img} alt="preview" className="w-full h-full object-cover" />
+                    {productForm.images.map((img, idx) => (
+                      <div key={idx} className="relative aspect-[3/4] border border-border group">
+                        <img src={img} alt="Thumb" className="w-full h-full object-cover" />
                         <button
                           type="button"
-                          onClick={() => handleRemoveImage(i)}
-                          className="absolute top-1 right-1 p-1 bg-black/80 text-white hover:bg-red-600 transition-colors"
-                          title="Remove image"
+                          onClick={() =>
+                            setProductForm((p) => ({
+                              ...p,
+                              images: p.images.filter((_, i) => i !== idx),
+                            }))
+                          }
+                          className="absolute top-1 right-1 p-1 bg-black/80 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -1386,79 +1645,136 @@ export const Admin: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Badges & Sizes */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-muted uppercase block">EDITORIAL BADGE</label>
-                    <select
-                      value={productForm.badge || ''}
-                      onChange={(e) => setProductForm((p) => ({ ...p, badge: (e.target.value as any) || undefined }))}
-                      className="w-full bg-background border border-border p-3 text-foreground uppercase focus:outline-none focus:border-foreground"
-                    >
-                      <option value="">NONE</option>
-                      <option value="BEST SELLER">BEST SELLER</option>
-                      <option value="NEW DROP">NEW DROP</option>
-                      <option value="RUNWAY">RUNWAY</option>
-                      <option value="SPECIAL EDITION">SPECIAL EDITION</option>
-                      <option value="ARCHIVE">ARCHIVE</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] text-muted uppercase block">SIZES OFFERED</label>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {allSizes.map((sz) => {
-                        const isIncluded = productForm.sizes.includes(sz);
-                        return (
-                          <button
-                            type="button"
-                            key={sz}
-                            onClick={() => {
-                              setProductForm((p) => ({
-                                ...p,
-                                sizes: isIncluded ? p.sizes.filter((s) => s !== sz) : [...p.sizes, sz],
-                              }));
-                            }}
-                            className={`px-2.5 py-1 text-[11px] border ${
-                              isIncluded ? 'bg-foreground text-background font-bold border-foreground' : 'border-border text-muted hover:border-foreground'
-                            }`}
-                          >
-                            {sz}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Description & Details */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-muted uppercase block">EDITORIAL DESCRIPTION *</label>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted uppercase">DESCRIPTION</label>
                   <textarea
                     rows={2}
-                    required
                     value={productForm.description}
                     onChange={(e) => setProductForm((p) => ({ ...p, description: e.target.value }))}
-                    className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground"
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
                   />
                 </div>
 
-                <div className="flex justify-end space-x-3 pt-4 border-t border-border">
-                  <button
-                    type="button"
-                    onClick={() => setIsProductModalOpen(false)}
-                    className="px-6 py-3 border border-border hover:border-foreground text-foreground uppercase tracking-widest"
-                  >
-                    CANCEL
-                  </button>
-                  <button
-                    type="submit"
-                    data-cursor="link"
-                    className="px-6 py-3 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90"
-                  >
-                    COMMIT TO REPERTORY
-                  </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted uppercase">DETAILS (1 PER LINE)</label>
+                    <textarea
+                      rows={3}
+                      value={productForm.details}
+                      onChange={(e) => setProductForm((p) => ({ ...p, details: e.target.value }))}
+                      className="w-full bg-background border border-border p-2.5 text-foreground"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted uppercase">CARE (1 PER LINE)</label>
+                    <textarea
+                      rows={3}
+                      value={productForm.care}
+                      onChange={(e) => setProductForm((p) => ({ ...p, care: e.target.value }))}
+                      className="w-full bg-background border border-border p-2.5 text-foreground"
+                    />
+                  </div>
                 </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90 mt-4"
+                >
+                  SAVE GARMENT
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: ADD / EDIT CATEGORY */}
+        {isCategoryModalOpen && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none">
+            <div className="relative w-full max-w-lg bg-surface border border-border p-6 md:p-8 space-y-6 text-xs font-mono text-foreground">
+              <div className="flex justify-between items-center pb-4 border-b border-border">
+                <h3 className="font-semibold text-foreground uppercase tracking-widest text-sm">
+                  {editingCategoryId ? 'EDIT CATEGORY' : 'ADD NEW TAXONOMY CATEGORY'}
+                </h3>
+                <button
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="text-muted hover:text-foreground p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveCategory} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted uppercase">CATEGORY NAME *</label>
+                  <input
+                    type="text"
+                    required
+                    value={categoryForm.name}
+                    onChange={(e) => setCategoryForm((p) => ({ ...p, name: e.target.value }))}
+                    placeholder="CORSETS & BODICES"
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted uppercase">SLUG (URL PATH)</label>
+                  <input
+                    type="text"
+                    value={categoryForm.slug}
+                    onChange={(e) => setCategoryForm((p) => ({ ...p, slug: e.target.value }))}
+                    placeholder="corsets"
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-muted uppercase block">COVER IMAGE</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={categoryForm.image}
+                      onChange={(e) => setCategoryForm((p) => ({ ...p, image: e.target.value }))}
+                      className="flex-1 bg-background border border-border p-2.5 text-foreground"
+                    />
+                    <label className="px-3 py-2.5 bg-surface border border-border hover:border-foreground text-foreground flex items-center space-x-1 cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>UPLOAD</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(e, 'category')}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted uppercase">DESCRIPTION</label>
+                  <textarea
+                    rows={2}
+                    value={categoryForm.description}
+                    onChange={(e) => setCategoryForm((p) => ({ ...p, description: e.target.value }))}
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] text-muted uppercase">EDITORIAL QUOTE</label>
+                  <input
+                    type="text"
+                    value={categoryForm.editorialQuote}
+                    onChange={(e) => setCategoryForm((p) => ({ ...p, editorialQuote: e.target.value }))}
+                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90 mt-2"
+                >
+                  SAVE CATEGORY
+                </button>
               </form>
             </div>
           </div>

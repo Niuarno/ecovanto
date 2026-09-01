@@ -1,11 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export interface UserAddress {
+  id: string;
+  title: string;
   address: string;
   apartment?: string;
   city: string;
   postalCode: string;
   country: string;
+  isDefault?: boolean;
+}
+
+export interface SavedPaymentCard {
+  id: string;
+  cardholderName: string;
+  last4: string;
+  brand: 'visa' | 'mastercard' | 'amex' | 'card';
+  expiryMonth: string;
+  expiryYear: string;
+  isDefault?: boolean;
 }
 
 export interface UserProfile {
@@ -15,6 +28,8 @@ export interface UserProfile {
   lastName: string;
   phone?: string;
   avatarUrl?: string;
+  addresses?: UserAddress[];
+  savedCards?: SavedPaymentCard[];
   defaultAddress?: UserAddress;
   createdAt: string;
   isGmailAuth?: boolean;
@@ -32,10 +47,18 @@ interface AuthContextType {
   adminLogin: (passcode: string) => boolean;
   adminLogout: () => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
+  addAddress: (address: Omit<UserAddress, 'id'>) => void;
+  updateAddress: (id: string, updates: Partial<UserAddress>) => void;
+  deleteAddress: (id: string) => void;
+  setDefaultAddress: (id: string) => void;
+  addSavedCard: (card: Omit<SavedPaymentCard, 'id'>) => void;
+  deleteSavedCard: (id: string) => void;
+  setDefaultSavedCard: (id: string) => void;
 }
 
-const AUTH_USER_KEY = 'ecovanto_auth_customer_v2';
+const AUTH_USER_KEY = 'ecovanto_auth_customer_v3';
 const ADMIN_AUTH_KEY = 'ecovanto_admin_session_v1';
+const ALL_CUSTOMERS_STORAGE_KEY = 'ecovanto_registered_customers_v3';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -57,9 +80,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
+  // Sync current user to customers list in localStorage for Admin CRM
+  const syncToCustomersList = (updatedUser: UserProfile) => {
+    try {
+      const existingStr = localStorage.getItem(ALL_CUSTOMERS_STORAGE_KEY);
+      let list: UserProfile[] = existingStr ? JSON.parse(existingStr) : [];
+      const index = list.findIndex((c) => c.email.toLowerCase() === updatedUser.email.toLowerCase());
+      if (index >= 0) {
+        list[index] = { ...list[index], ...updatedUser };
+      } else {
+        list.unshift(updatedUser);
+      }
+      localStorage.setItem(ALL_CUSTOMERS_STORAGE_KEY, JSON.stringify(list));
+    } catch (e) {
+      console.error('Error syncing customer list:', e);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+      syncToCustomersList(user);
     } else {
       localStorage.removeItem(AUTH_USER_KEY);
     }
@@ -72,24 +113,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email,
       firstName: namePart.charAt(0).toUpperCase() + namePart.slice(1),
       lastName: 'Client',
-      phone: '+49 171 000000',
+      phone: '',
       createdAt: new Date().toISOString(),
-      defaultAddress: {
-        address: 'Auguststraße 14',
-        city: 'Berlin',
-        postalCode: '10117',
-        country: 'Germany',
-      },
+      addresses: [],
+      savedCards: [],
     };
     setUser(newUser);
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(newUser));
     return true;
   };
 
   const loginWithGoogleData = (profileData: UserProfile): UserProfile => {
-    setUser(profileData);
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(profileData));
-    return profileData;
+    const enrichedUser: UserProfile = {
+      ...profileData,
+      addresses: profileData.addresses || [],
+      savedCards: profileData.savedCards || [],
+    };
+    setUser(enrichedUser);
+    return enrichedUser;
   };
 
   const loginWithGmail = async (): Promise<UserProfile> => {
@@ -99,19 +139,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       firstName: 'Elena',
       lastName: 'Voss',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-      phone: '+49 172 8492019',
+      phone: '',
       isGmailAuth: true,
       createdAt: new Date().toISOString(),
-      defaultAddress: {
-        address: 'Köpenicker Str. 124',
-        apartment: 'Studio 4A',
-        city: 'Berlin',
-        postalCode: '10997',
-        country: 'Germany',
-      },
+      addresses: [],
+      savedCards: [],
     };
     setUser(gmailUser);
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(gmailUser));
     return gmailUser;
   };
 
@@ -123,21 +157,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastName: data.lastName,
       phone: data.phone || '',
       createdAt: new Date().toISOString(),
-      defaultAddress: {
-        address: 'Auguststraße 14',
-        city: 'Berlin',
-        postalCode: '10117',
-        country: 'Germany',
-      },
+      addresses: [],
+      savedCards: [],
     };
     setUser(newUser);
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(newUser));
     return newUser;
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem(AUTH_USER_KEY);
   };
 
   const adminLogin = (passcode: string): boolean => {
@@ -157,8 +185,107 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = (updates: Partial<UserProfile>) => {
     setUser((prev) => {
       const updated = prev ? { ...prev, ...updates } : (updates as UserProfile);
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(updated));
       return updated;
+    });
+  };
+
+  // Address Book Actions
+  const addAddress = (addressData: Omit<UserAddress, 'id'>) => {
+    const newAddr: UserAddress = {
+      ...addressData,
+      id: `addr-${Date.now()}`,
+    };
+    setUser((prev) => {
+      if (!prev) return null;
+      const currentList = prev.addresses || [];
+      const updatedList = newAddr.isDefault
+        ? [...currentList.map((a) => ({ ...a, isDefault: false })), newAddr]
+        : [...currentList, newAddr];
+      return {
+        ...prev,
+        addresses: updatedList,
+        defaultAddress: newAddr.isDefault || currentList.length === 0 ? newAddr : prev.defaultAddress,
+      };
+    });
+  };
+
+  const updateAddress = (id: string, updates: Partial<UserAddress>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updatedList = (prev.addresses || []).map((a) => (a.id === id ? { ...a, ...updates } : a));
+      const def = updatedList.find((a) => a.isDefault) || updatedList[0];
+      return {
+        ...prev,
+        addresses: updatedList,
+        defaultAddress: def,
+      };
+    });
+  };
+
+  const deleteAddress = (id: string) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updatedList = (prev.addresses || []).filter((a) => a.id !== id);
+      const def = updatedList.find((a) => a.isDefault) || updatedList[0];
+      return {
+        ...prev,
+        addresses: updatedList,
+        defaultAddress: def,
+      };
+    });
+  };
+
+  const setDefaultAddress = (id: string) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updatedList = (prev.addresses || []).map((a) => ({ ...a, isDefault: a.id === id }));
+      const def = updatedList.find((a) => a.id === id);
+      return {
+        ...prev,
+        addresses: updatedList,
+        defaultAddress: def,
+      };
+    });
+  };
+
+  // Saved Payment Methods Actions
+  const addSavedCard = (cardData: Omit<SavedPaymentCard, 'id'>) => {
+    const newCard: SavedPaymentCard = {
+      ...cardData,
+      id: `card-${Date.now()}`,
+    };
+    setUser((prev) => {
+      if (!prev) return null;
+      const currentCards = prev.savedCards || [];
+      const updatedCards = newCard.isDefault
+        ? [...currentCards.map((c) => ({ ...c, isDefault: false })), newCard]
+        : [...currentCards, newCard];
+      return {
+        ...prev,
+        savedCards: updatedCards,
+      };
+    });
+  };
+
+  const deleteSavedCard = (id: string) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updatedCards = (prev.savedCards || []).filter((c) => c.id !== id);
+      return {
+        ...prev,
+        savedCards: updatedCards,
+      };
+    });
+  };
+
+  const setDefaultSavedCard = (id: string) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updatedCards = (prev.savedCards || []).map((c) => ({ ...c, isDefault: c.id === id }));
+      return {
+        ...prev,
+        savedCards: updatedCards,
+      };
     });
   };
 
@@ -176,6 +303,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         adminLogin,
         adminLogout,
         updateProfile,
+        addAddress,
+        updateAddress,
+        deleteAddress,
+        setDefaultAddress,
+        addSavedCard,
+        deleteSavedCard,
+        setDefaultSavedCard,
       }}
     >
       {children}

@@ -68,3 +68,53 @@ export interface ToastMessage {
 }
 
 export type SortOption = 'featured' | 'price-asc' | 'price-desc' | 'newest';
+
+export interface ShippingMethod {
+  id: string;
+  name: string;
+  carrier: string;
+  price: number;
+  deliveryTime: string;
+}
+
+export interface OrderItem {
+  productId: string;
+  productName: string;
+  productSlug: string;
+  image: string;
+  price: number;
+  size: Size;
+  color: string | ProductColor;
+  quantity: number;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  customer: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    address: string;
+    apartment?: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  };
+  shippingMethod: ShippingMethod;
+  paymentMethod: string;
+  paymentDetails?: {
+    last4?: string;
+    brand?: string;
+    cardHolder?: string;
+  };
+  items: OrderItem[];
+  subtotal: number;
+  shippingCost: number;
+  discount: number;
+  total: number;
+  status: 'pending' | 'preparing' | 'processing' | 'dispatched' | 'delivered' | 'cancelled';
+  trackingNumber: string;
+  createdAt: string;
+}

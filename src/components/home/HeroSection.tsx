@@ -3,10 +3,13 @@ import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowDownRight } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useStore, DEFAULT_HERO } from '../../context/StoreContext';
 
 export const HeroSection: React.FC = () => {
   const { scrollY } = useScroll();
   const { theme } = useTheme();
+  const { hero = DEFAULT_HERO } = useStore();
+
   const scale = useTransform(scrollY, [0, 800], [1.02, 1.08]);
   const opacity = useTransform(scrollY, [0, 600], [1, 0.4]);
 
@@ -20,7 +23,7 @@ export const HeroSection: React.FC = () => {
         className="absolute inset-0 w-full h-full"
       >
         <img
-          src="https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=2000&q=90"
+          src={hero.imageUrl || DEFAULT_HERO.imageUrl}
           alt="ECOVANTO Editorial Hero"
           className={`w-full h-full object-cover object-center ${
             isDark ? 'brightness-[0.75] contrast-[1.12]' : 'brightness-[0.95] contrast-[1.05]'
@@ -42,10 +45,10 @@ export const HeroSection: React.FC = () => {
         <div className="flex justify-between items-start text-[10px] md:text-xs font-mono tracking-[0.25em] text-muted uppercase">
           <div className="flex items-center space-x-2">
             <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-foreground inline-block animate-pulse rounded-full" />
-            <span className="truncate">COLLECTION 2026 // RELEASE 04</span>
+            <span className="truncate">{hero.seasonKicker || DEFAULT_HERO.seasonKicker}</span>
           </div>
           <div className="text-right hidden sm:block">
-            <span>BERLIN // 52.5200° N, 13.4050° E</span>
+            <span>{hero.kickerSubtitle || DEFAULT_HERO.kickerSubtitle}</span>
           </div>
         </div>
 
@@ -57,10 +60,13 @@ export const HeroSection: React.FC = () => {
             transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
           >
             <span className="text-[10px] sm:text-xs md:text-sm font-mono tracking-[0.25em] sm:tracking-[0.3em] uppercase text-muted block mb-2 leading-relaxed">
-              WHERE ARCHITECTURAL RIGOR MEETS RAW SENSUALITY
+              {hero.subheading || DEFAULT_HERO.subheading}
             </span>
             <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-light font-display tracking-tight uppercase leading-[0.95] text-foreground">
-              LIFE <span className="italic font-serif font-normal text-stroke-strong">FORCE</span>
+              {hero.headingPrefix || DEFAULT_HERO.headingPrefix}{' '}
+              <span className="italic font-serif font-normal text-stroke-strong">
+                {hero.headingHighlight || DEFAULT_HERO.headingHighlight}
+              </span>
             </h1>
           </motion.div>
 
@@ -70,7 +76,7 @@ export const HeroSection: React.FC = () => {
             transition={{ duration: 0.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className="text-xs sm:text-sm font-light text-foreground-secondary max-w-lg leading-relaxed"
           >
-            Sculptural corsetry, deconstructed virgin wool suiting, and fluid nocturnal eveningwear engineered for unconventional bodies.
+            {hero.description || DEFAULT_HERO.description}
           </motion.p>
         </div>
 
@@ -78,20 +84,20 @@ export const HeroSection: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 pt-4 sm:pt-6 border-t border-border">
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             <Link
-              to="/shop"
+              to={hero.primaryButtonLink || '/shop'}
               data-cursor="link"
               className="px-6 sm:px-8 py-3.5 sm:py-4 bg-foreground text-background font-mono text-[11px] sm:text-xs uppercase tracking-[0.2em] transition-all duration-300 flex items-center space-x-2.5 sm:space-x-3 group font-semibold"
             >
-              <span>SEE COLLECTION</span>
+              <span>{hero.primaryButtonText || 'SEE COLLECTION'}</span>
               <ArrowDownRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:translate-y-0.5 transition-transform" />
             </Link>
 
             <Link
-              to="/campaign"
+              to={hero.secondaryButtonLink || '/campaign'}
               data-cursor="link"
               className="px-6 sm:px-8 py-3.5 sm:py-4 border border-border hover:border-foreground text-foreground font-mono text-[11px] sm:text-xs uppercase tracking-[0.2em] transition-colors"
             >
-              BE YOURSELF
+              {hero.secondaryButtonText || 'BE YOURSELF'}
             </Link>
           </div>
 

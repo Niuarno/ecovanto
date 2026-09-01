@@ -36,6 +36,7 @@ import { OrdersLookup } from './pages/OrdersLookup';
 import { Account } from './pages/Account';
 import { Admin } from './pages/Admin';
 import { NotFound } from './pages/NotFound';
+import { FacebookPixel } from './components/common/FacebookPixel';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -51,6 +52,9 @@ export const App: React.FC = () => {
   return (
     <SmoothScroll>
       <div className="relative min-h-screen bg-background text-foreground selection:bg-foreground selection:text-background transition-colors duration-300">
+        {/* Facebook Pixel Tracker */}
+        <FacebookPixel />
+
         {/* Short Luxury Percentage Loading Experience */}
         <LoadingScreen />
 

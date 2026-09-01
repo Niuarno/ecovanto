@@ -235,7 +235,7 @@ export const OrderDetail: React.FC = () => {
             </h2>
 
             <div className="divide-y divide-border/50 space-y-4">
-              {order.items.map((item, idx) => (
+              {order.items.map((item: any, idx: number) => (
                 <div key={idx} className="flex space-x-4 pt-4 first:pt-0">
                   <div className="w-20 h-28 bg-background overflow-hidden flex-shrink-0 border border-border">
                     <img
@@ -326,7 +326,7 @@ export const OrderDetail: React.FC = () => {
                 </div>
 
                 <div className="pt-2 text-[10px] font-mono text-muted">
-                  PAYMENT METHOD: {order.paymentMethod.toUpperCase()} (••• {order.paymentDetails.last4})
+                  PAYMENT METHOD: {order.paymentMethod.toUpperCase()} {order.paymentDetails?.last4 ? `(••• ${order.paymentDetails.last4})` : ''}
                 </div>
               </div>
             </div>

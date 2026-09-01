@@ -16,8 +16,10 @@ import {
   Check,
   AlertCircle,
   Building,
+  MapPin,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { trackFBPixelEvent } from '../components/common/FacebookPixel';
 
 const SHIPPING_METHODS: ShippingMethod[] = [
   {
@@ -89,6 +91,16 @@ export const Checkout: React.FC = () => {
 
   const actualShippingCost = subtotal >= settings.freeShippingThreshold ? 0 : selectedShipping.price;
   const orderTotal = Math.max(subtotal - discountAmount + actualShippingCost, 0);
+
+  useEffect(() => {
+    if (cart.length > 0) {
+      trackFBPixelEvent('InitiateCheckout', {
+        num_items: cart.length,
+        value: subtotal,
+        currency: 'EUR',
+      });
+    }
+  }, []);
 
   if (cart.length === 0 && !isProcessing) {
     return (
@@ -200,6 +212,14 @@ export const Checkout: React.FC = () => {
 
       clearCart();
       setIsProcessing(false);
+
+      // Facebook Pixel Purchase Event
+      trackFBPixelEvent('Purchase', {
+        value: orderTotal,
+        currency: 'EUR',
+        order_id: newOrder.orderNumber,
+        num_items: orderItems.length,
+      });
 
       try {
         confetti({

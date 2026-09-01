@@ -1,14 +1,13 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { CATEGORIES } from '../data/categories';
 import { useStore } from '../context/StoreContext';
 import { ProductCard } from '../components/product/ProductCard';
 import { ArrowLeft } from 'lucide-react';
 
 export const CategoryDetail: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
-  const { products } = useStore();
-  const category = CATEGORIES.find(
+  const { products, categories } = useStore();
+  const category = categories.find(
     (c) => c.slug.toLowerCase() === slug?.toLowerCase()
   );
 

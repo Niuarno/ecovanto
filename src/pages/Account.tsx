@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, UserAddress, SavedPaymentCard } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useUI } from '../context/UIContext';
@@ -9,15 +9,17 @@ import { PhoneInput } from '../components/common/PhoneInput';
 import { CountrySelect } from '../components/common/CountrySelect';
 import { jwtDecode } from 'jwt-decode';
 import {
-  User,
   ShoppingBag,
   Heart,
   MapPin,
-  Lock,
+  CreditCard,
   LogOut,
   ArrowRight,
   ShieldCheck,
-  Check,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  User as UserIcon,
 } from 'lucide-react';
 
 interface GoogleTokenPayload {
@@ -36,13 +38,31 @@ declare global {
 }
 
 export const Account: React.FC = () => {
-  const { user, isAuthenticated, login, register, logout, updateProfile, loginWithGoogleData } = useAuth();
+  const {
+    user,
+    isAuthenticated,
+    login,
+    register,
+    logout,
+    updateProfile,
+    loginWithGoogleData,
+    addAddress,
+    deleteAddress,
+    setDefaultAddress,
+    addSavedCard,
+    deleteSavedCard,
+    setDefaultSavedCard,
+  } = useAuth();
+
   const { orders, settings } = useStore();
   const { favorites } = useFavorites();
   const { showToast } = useUI();
   const { theme } = useTheme();
 
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [activeTab, setActiveTab] = useState<'orders' | 'addresses' | 'payments' | 'settings'>('orders');
+
+  // Form State for Auth
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -50,15 +70,38 @@ export const Account: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // New Address Modal / State
+  const [isAddingAddress, setIsAddingAddress] = useState(false);
+  const [newAddressForm, setNewAddressForm] = useState({
+    title: 'Primary Residence',
+    address: '',
+    apartment: '',
+    city: '',
+    postalCode: '',
+    country: 'Germany',
+    isDefault: true,
+  });
+
+  // New Card Modal / State
+  const [isAddingCard, setIsAddingCard] = useState(false);
+  const [newCardForm, setNewCardForm] = useState({
+    cardholderName: '',
+    number: '',
+    expiryMonth: '12',
+    expiryYear: '2028',
+    brand: 'visa' as const,
+    isDefault: true,
+  });
+
   const googleButtonContainerRef = useRef<HTMLDivElement>(null);
 
-  // Active Google Client ID (from protected store settings or Vercel environment variable)
+  // Active Google Client ID
   const activeClientId =
     settings.googleClientId?.trim() ||
     ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID?.trim()) ||
     '';
 
-  // Handle Real Google JWT Credential Response from Google Identity Services
+  // Handle Real Google JWT Credential Response
   const handleGoogleCredentialResponse = (response: any) => {
     try {
       if (!response.credential) return;
@@ -72,12 +115,8 @@ export const Account: React.FC = () => {
         avatarUrl: decoded.picture,
         isGmailAuth: true,
         createdAt: new Date().toISOString(),
-        defaultAddress: {
-          address: 'Auguststraße 14',
-          city: 'Berlin',
-          postalCode: '10117',
-          country: 'Germany',
-        },
+        addresses: [],
+        savedCards: [],
       };
 
       loginWithGoogleData(realGoogleUser);
@@ -96,9 +135,9 @@ export const Account: React.FC = () => {
     }
   };
 
-  // Render the Official Google Button using Google's official SDK styled to theme
+  // Render Official Google Button
   useEffect(() => {
-    if (!activeClientId) return;
+    if (!activeClientId || isAuthenticated) return;
 
     const renderOfficialGoogleButton = () => {
       if (window.google?.accounts?.id && googleButtonContainerRef.current) {
@@ -166,29 +205,70 @@ export const Account: React.FC = () => {
     });
   };
 
-  // Address edit in profile
-  const [isEditingAddress, setIsEditingAddress] = useState(false);
-  const [addressForm, setAddressForm] = useState({
-    address: user?.defaultAddress?.address || 'Auguststraße 14',
-    apartment: user?.defaultAddress?.apartment || '',
-    city: user?.defaultAddress?.city || 'Berlin',
-    postalCode: user?.defaultAddress?.postalCode || '10117',
-    country: user?.defaultAddress?.country || 'Germany',
-  });
-
-  const handleSaveAddress = (e: React.FormEvent) => {
+  // Address creation handler
+  const handleCreateAddress = (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile({ defaultAddress: addressForm });
-    setIsEditingAddress(false);
+    if (!newAddressForm.address || !newAddressForm.city) return;
+    addAddress(newAddressForm);
+    setIsAddingAddress(false);
+    setNewAddressForm({
+      title: 'Secondary Residence',
+      address: '',
+      apartment: '',
+      city: '',
+      postalCode: '',
+      country: 'Germany',
+      isDefault: false,
+    });
     showToast({
       type: 'success',
-      title: 'COORDINATES SAVED',
-      message: 'Default delivery coordinates updated.',
+      title: 'ADDRESS SAVED',
+      message: 'New delivery coordinates added to address book.',
+    });
+  };
+
+  // Saved card creation handler
+  const handleCreateCard = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCardForm.number || !newCardForm.cardholderName) return;
+    const cleanNum = newCardForm.number.replace(/\s+/g, '');
+    const last4 = cleanNum.slice(-4) || '8841';
+
+    let brand: 'visa' | 'mastercard' | 'amex' | 'card' = 'visa';
+    if (cleanNum.startsWith('5')) brand = 'mastercard';
+    if (cleanNum.startsWith('3')) brand = 'amex';
+
+    addSavedCard({
+      cardholderName: newCardForm.cardholderName.toUpperCase(),
+      last4,
+      brand,
+      expiryMonth: newCardForm.expiryMonth,
+      expiryYear: newCardForm.expiryYear,
+      isDefault: newCardForm.isDefault,
+    });
+
+    setIsAddingCard(false);
+    setNewCardForm({
+      cardholderName: '',
+      number: '',
+      expiryMonth: '12',
+      expiryYear: '2028',
+      brand: 'visa',
+      isDefault: false,
+    });
+
+    showToast({
+      type: 'success',
+      title: 'PAYMENT METHOD SECURED',
+      message: `Card ending in •••• ${last4} added to your vault.`,
     });
   };
 
   const customerOrders = orders.filter(
-    (o) => !user || o.customer.email.toLowerCase() === user.email.toLowerCase() || o.customer.lastName.toLowerCase() === user.lastName.toLowerCase()
+    (o) =>
+      !user ||
+      o.customer.email.toLowerCase() === user.email.toLowerCase() ||
+      o.customer.lastName.toLowerCase() === user.lastName.toLowerCase()
   );
 
   return (
@@ -373,9 +453,9 @@ export const Account: React.FC = () => {
             )}
           </div>
         ) : (
-          /* Authenticated Profile Dashboard */
-          <div className="space-y-12">
-            {/* Header */}
+          /* Authenticated Customer Dashboard */
+          <div className="space-y-10">
+            {/* Profile Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between pb-8 border-b border-border gap-4">
               <div className="flex items-center space-x-4">
                 {user.avatarUrl ? (
@@ -386,7 +466,8 @@ export const Account: React.FC = () => {
                   />
                 ) : (
                   <div className="w-14 h-14 bg-foreground text-background flex items-center justify-center font-mono text-xl font-bold uppercase">
-                    {user.firstName?.charAt(0) || 'E'}{user.lastName?.charAt(0) || 'V'}
+                    {user.firstName?.charAt(0) || 'E'}
+                    {user.lastName?.charAt(0) || 'V'}
                   </div>
                 )}
                 <div>
@@ -417,7 +498,7 @@ export const Account: React.FC = () => {
               </button>
             </div>
 
-            {/* 3 Metric Cards */}
+            {/* Metric Overview Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs font-mono">
               <div className="p-6 bg-surface border border-border space-y-2">
                 <span className="text-muted uppercase tracking-widest flex items-center space-x-2">
@@ -450,16 +531,63 @@ export const Account: React.FC = () => {
               </div>
             </div>
 
-            {/* 2 Columns: Orders and Delivery Address */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* Left Column: Order History */}
-              <div className="lg:col-span-8 bg-surface border border-border p-6 md:p-8 space-y-6">
+            {/* Dashboard Navigation Tabs */}
+            <div className="flex border-b border-border text-xs font-mono overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setActiveTab('orders')}
+                data-cursor="link"
+                className={`px-6 py-3 uppercase tracking-widest font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'orders'
+                    ? 'border-foreground text-foreground bg-surface-subtle'
+                    : 'border-transparent text-muted hover:text-foreground'
+                }`}
+              >
+                ACQUISITIONS [{customerOrders.length}]
+              </button>
+              <button
+                onClick={() => setActiveTab('addresses')}
+                data-cursor="link"
+                className={`px-6 py-3 uppercase tracking-widest font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'addresses'
+                    ? 'border-foreground text-foreground bg-surface-subtle'
+                    : 'border-transparent text-muted hover:text-foreground'
+                }`}
+              >
+                ADDRESS BOOK [{(user.addresses || []).length}]
+              </button>
+              <button
+                onClick={() => setActiveTab('payments')}
+                data-cursor="link"
+                className={`px-6 py-3 uppercase tracking-widest font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'payments'
+                    ? 'border-foreground text-foreground bg-surface-subtle'
+                    : 'border-transparent text-muted hover:text-foreground'
+                }`}
+              >
+                PAYMENT METHODS [{(user.savedCards || []).length}]
+              </button>
+              <button
+                onClick={() => setActiveTab('settings')}
+                data-cursor="link"
+                className={`px-6 py-3 uppercase tracking-widest font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === 'settings'
+                    ? 'border-foreground text-foreground bg-surface-subtle'
+                    : 'border-transparent text-muted hover:text-foreground'
+                }`}
+              >
+                PROFILE SETTINGS
+              </button>
+            </div>
+
+            {/* TAB 1: ACQUISITION & DISPATCH HISTORY */}
+            {activeTab === 'orders' && (
+              <div className="bg-surface border border-border p-6 md:p-8 space-y-6">
                 <div className="flex justify-between items-center pb-3 border-b border-border">
                   <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
-                    ACQUISITION & DISPATCH HISTORY [{customerOrders.length}]
+                    ACQUISITIONS & DISPATCH LOG
                   </h2>
                   <Link to="/shop" className="text-xs font-mono text-muted hover:text-foreground underline">
-                    EXPLORE SHOP
+                    EXPLORE SHOP ↗
                   </Link>
                 </div>
 
@@ -485,7 +613,7 @@ export const Account: React.FC = () => {
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
                             <span className="font-semibold text-foreground">#{ord.orderNumber}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 bg-surface-subtle text-foreground uppercase border border-border">
+                            <span className="text-[9px] px-1.5 py-0.5 bg-surface text-foreground uppercase border border-border">
                               {ord.status}
                             </span>
                           </div>
@@ -510,82 +638,404 @@ export const Account: React.FC = () => {
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Right Column: Address Book */}
-              <div className="lg:col-span-4 bg-surface border border-border p-6 md:p-8 space-y-6">
+            {/* TAB 2: ADDRESS BOOK */}
+            {activeTab === 'addresses' && (
+              <div className="space-y-6">
                 <div className="flex justify-between items-center pb-3 border-b border-border">
-                  <h3 className="text-sm font-mono tracking-widest uppercase text-foreground">
-                    DELIVERY COORDINATES
-                  </h3>
+                  <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
+                    DELIVERY COORDINATES & ADDRESS BOOK
+                  </h2>
                   <button
-                    onClick={() => setIsEditingAddress(!isEditingAddress)}
-                    className="text-xs font-mono text-muted hover:text-foreground underline"
+                    onClick={() => setIsAddingAddress(!isAddingAddress)}
+                    data-cursor="link"
+                    className="px-4 py-2 bg-foreground text-background text-xs font-mono uppercase tracking-widest flex items-center space-x-1.5 font-semibold"
                   >
-                    {isEditingAddress ? 'CANCEL' : 'EDIT'}
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isAddingAddress ? 'CANCEL' : 'ADD NEW ADDRESS'}</span>
                   </button>
                 </div>
 
-                {isEditingAddress ? (
-                  <form onSubmit={handleSaveAddress} className="space-y-3 text-xs font-mono">
+                {isAddingAddress && (
+                  <form
+                    onSubmit={handleCreateAddress}
+                    className="p-6 bg-surface border border-border space-y-4 text-xs font-mono"
+                  >
+                    <h3 className="font-semibold text-foreground uppercase tracking-widest text-xs">
+                      NEW DELIVERY LOCATION
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted uppercase">ADDRESS LABEL</label>
+                        <input
+                          type="text"
+                          required
+                          value={newAddressForm.title}
+                          onChange={(e) => setNewAddressForm((p) => ({ ...p, title: e.target.value }))}
+                          placeholder="E.G. PRIMARY RESIDENCE / STUDIO"
+                          className="w-full bg-background border border-border p-2.5 text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted uppercase">STREET ADDRESS *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newAddressForm.address}
+                          onChange={(e) => setNewAddressForm((p) => ({ ...p, address: e.target.value }))}
+                          placeholder="TORSTRASSE 84"
+                          className="w-full bg-background border border-border p-2.5 text-foreground"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted uppercase">APARTMENT / SUITE</label>
+                        <input
+                          type="text"
+                          value={newAddressForm.apartment}
+                          onChange={(e) => setNewAddressForm((p) => ({ ...p, apartment: e.target.value }))}
+                          placeholder="APT 4B"
+                          className="w-full bg-background border border-border p-2.5 text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted uppercase">CITY *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newAddressForm.city}
+                          onChange={(e) => setNewAddressForm((p) => ({ ...p, city: e.target.value }))}
+                          placeholder="BERLIN"
+                          className="w-full bg-background border border-border p-2.5 text-foreground"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted uppercase">POSTAL CODE *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newAddressForm.postalCode}
+                          onChange={(e) => setNewAddressForm((p) => ({ ...p, postalCode: e.target.value }))}
+                          placeholder="10119"
+                          className="w-full bg-background border border-border p-2.5 text-foreground"
+                        />
+                      </div>
+                    </div>
+
                     <div className="space-y-1">
-                      <label className="text-[9px] text-muted uppercase">STREET ADDRESS</label>
+                      <CountrySelect
+                        value={newAddressForm.country}
+                        onChange={(c) => setNewAddressForm((p) => ({ ...p, country: c }))}
+                        label="COUNTRY / TERRITORY"
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-2 pt-2">
+                      <input
+                        type="checkbox"
+                        id="isDefaultAddr"
+                        checked={newAddressForm.isDefault}
+                        onChange={(e) => setNewAddressForm((p) => ({ ...p, isDefault: e.target.checked }))}
+                        className="rounded border-border text-foreground"
+                      />
+                      <label htmlFor="isDefaultAddr" className="text-xs text-muted uppercase">
+                        SET AS DEFAULT DELIVERY COORDINATES
+                      </label>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="px-6 py-3 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90"
+                    >
+                      SAVE TO ADDRESS BOOK
+                    </button>
+                  </form>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(user.addresses || []).length === 0 ? (
+                    <div className="p-8 bg-surface border border-border text-center col-span-2 space-y-2">
+                      <MapPin className="w-6 h-6 text-muted mx-auto" />
+                      <p className="text-xs font-mono text-muted uppercase">
+                        NO SAVED ADDRESSES YET. CLICK "ADD NEW ADDRESS" TO SAVE RECIPIENT COORDINATES.
+                      </p>
+                    </div>
+                  ) : (
+                    (user.addresses || []).map((addr) => (
+                      <div
+                        key={addr.id}
+                        className={`p-5 bg-surface border ${
+                          addr.isDefault ? 'border-foreground' : 'border-border'
+                        } flex flex-col justify-between space-y-4 text-xs font-mono`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-foreground uppercase">{addr.title}</span>
+                            {addr.isDefault && (
+                              <span className="text-[9px] px-2 py-0.5 bg-foreground text-background uppercase font-bold">
+                                DEFAULT
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-foreground">{addr.address}</div>
+                          {addr.apartment && <div className="text-muted">{addr.apartment}</div>}
+                          <div className="text-muted">
+                            {addr.postalCode} {addr.city}, {addr.country}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-4 pt-3 border-t border-border">
+                          {!addr.isDefault && (
+                            <button
+                              onClick={() => setDefaultAddress(addr.id)}
+                              className="text-xs text-muted hover:text-foreground underline"
+                            >
+                              SET AS DEFAULT
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteAddress(addr.id)}
+                            className="text-xs text-red-400 hover:text-red-300 flex items-center space-x-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>DELETE</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: SAVED PAYMENT METHODS */}
+            {activeTab === 'payments' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center pb-3 border-b border-border">
+                  <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
+                    SAVED CARDS & VAULT PAYMENT METHODS
+                  </h2>
+                  <button
+                    onClick={() => setIsAddingCard(!isAddingCard)}
+                    data-cursor="link"
+                    className="px-4 py-2 bg-foreground text-background text-xs font-mono uppercase tracking-widest flex items-center space-x-1.5 font-semibold"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isAddingCard ? 'CANCEL' : 'ADD NEW CARD'}</span>
+                  </button>
+                </div>
+
+                {isAddingCard && (
+                  <form
+                    onSubmit={handleCreateCard}
+                    className="p-6 bg-surface border border-border space-y-4 text-xs font-mono max-w-lg"
+                  >
+                    <h3 className="font-semibold text-foreground uppercase tracking-widest text-xs">
+                      SAVE CARD TO ENCRYPTED VAULT
+                    </h3>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted uppercase">NAME ON CARD *</label>
                       <input
                         type="text"
                         required
-                        value={addressForm.address}
-                        onChange={(e) => setAddressForm((p) => ({ ...p, address: e.target.value }))}
+                        value={newCardForm.cardholderName}
+                        onChange={(e) => setNewCardForm((p) => ({ ...p, cardholderName: e.target.value }))}
+                        placeholder="ELENA VOSS"
                         className="w-full bg-background border border-border p-2.5 text-foreground"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-[9px] text-muted uppercase">CITY</label>
-                        <input
-                          type="text"
-                          required
-                          value={addressForm.city}
-                          onChange={(e) => setAddressForm((p) => ({ ...p, city: e.target.value }))}
-                          className="w-full bg-background border border-border p-2.5 text-foreground"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] text-muted uppercase">POSTAL CODE</label>
-                        <input
-                          type="text"
-                          required
-                          value={addressForm.postalCode}
-                          onChange={(e) => setAddressForm((p) => ({ ...p, postalCode: e.target.value }))}
-                          className="w-full bg-background border border-border p-2.5 text-foreground"
-                        />
-                      </div>
-                    </div>
+
                     <div className="space-y-1">
-                      <CountrySelect
-                        value={addressForm.country}
-                        onChange={(c) => setAddressForm((p) => ({ ...p, country: c }))}
-                        label="COUNTRY"
+                      <label className="text-[10px] text-muted uppercase">CARD NUMBER *</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={19}
+                        value={newCardForm.number}
+                        onChange={(e) => setNewCardForm((p) => ({ ...p, number: e.target.value }))}
+                        placeholder="•••• •••• •••• ••••"
+                        className="w-full bg-background border border-border p-2.5 text-foreground"
                       />
                     </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted uppercase">EXPIRY MONTH</label>
+                        <select
+                          value={newCardForm.expiryMonth}
+                          onChange={(e) => setNewCardForm((p) => ({ ...p, expiryMonth: e.target.value }))}
+                          className="w-full bg-background border border-border p-2.5 text-foreground"
+                        >
+                          {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-muted uppercase">EXPIRY YEAR</label>
+                        <select
+                          value={newCardForm.expiryYear}
+                          onChange={(e) => setNewCardForm((p) => ({ ...p, expiryYear: e.target.value }))}
+                          className="w-full bg-background border border-border p-2.5 text-foreground"
+                        >
+                          {['2026', '2027', '2028', '2029', '2030', '2031'].map((y) => (
+                            <option key={y} value={y}>
+                              {y}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 pt-2">
+                      <input
+                        type="checkbox"
+                        id="isDefaultCard"
+                        checked={newCardForm.isDefault}
+                        onChange={(e) => setNewCardForm((p) => ({ ...p, isDefault: e.target.checked }))}
+                        className="rounded border-border text-foreground"
+                      />
+                      <label htmlFor="isDefaultCard" className="text-xs text-muted uppercase">
+                        SET AS DEFAULT PAYMENT METHOD
+                      </label>
+                    </div>
+
                     <button
                       type="submit"
-                      className="w-full py-2.5 bg-foreground text-background uppercase tracking-wider font-semibold hover:opacity-90"
+                      className="px-6 py-3 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90"
                     >
-                      SAVE COORDINATES
+                      ENCRYPT & SAVE CARD
                     </button>
                   </form>
-                ) : (
-                  <div className="space-y-2 text-xs font-mono text-foreground-secondary">
-                    <div className="text-foreground font-medium">
-                      {user.firstName} {user.lastName}
-                    </div>
-                    <div>{user.defaultAddress?.address || 'Auguststraße 14'}</div>
-                    <div>{user.defaultAddress?.postalCode || '10117'} {user.defaultAddress?.city || 'Berlin'}</div>
-                    <div>{user.defaultAddress?.country || 'Germany'}</div>
-                    <div className="pt-2 text-muted">PHONE: {user.phone || '+49 171 000000'}</div>
-                  </div>
                 )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(user.savedCards || []).length === 0 ? (
+                    <div className="p-8 bg-surface border border-border text-center col-span-2 space-y-2">
+                      <CreditCard className="w-6 h-6 text-muted mx-auto" />
+                      <p className="text-xs font-mono text-muted uppercase">
+                        NO SAVED PAYMENT CARDS. ADD A CARD FOR 1-CLICK ATELIER CHECKOUT.
+                      </p>
+                    </div>
+                  ) : (
+                    (user.savedCards || []).map((card) => (
+                      <div
+                        key={card.id}
+                        className={`p-5 bg-surface border ${
+                          card.isDefault ? 'border-foreground' : 'border-border'
+                        } flex flex-col justify-between space-y-4 text-xs font-mono`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-foreground uppercase tracking-widest flex items-center space-x-2">
+                              <CreditCard className="w-4 h-4" />
+                              <span>{card.brand.toUpperCase()} •••• {card.last4}</span>
+                            </span>
+                            {card.isDefault && (
+                              <span className="text-[9px] px-2 py-0.5 bg-foreground text-background uppercase font-bold">
+                                DEFAULT
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-muted">HOLDER: {card.cardholderName}</div>
+                          <div className="text-muted">EXPIRES: {card.expiryMonth}/{card.expiryYear}</div>
+                        </div>
+
+                        <div className="flex items-center space-x-4 pt-3 border-t border-border">
+                          {!card.isDefault && (
+                            <button
+                              onClick={() => setDefaultSavedCard(card.id)}
+                              className="text-xs text-muted hover:text-foreground underline"
+                            >
+                              SET AS DEFAULT
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteSavedCard(card.id)}
+                            className="text-xs text-red-400 hover:text-red-300 flex items-center space-x-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>DELETE</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* TAB 4: PROFILE SETTINGS */}
+            {activeTab === 'settings' && (
+              <div className="bg-surface border border-border p-6 md:p-8 space-y-6 max-w-xl text-xs font-mono">
+                <h2 className="text-sm font-mono tracking-widest uppercase text-foreground pb-3 border-b border-border">
+                  CLIENT CREDENTIALS
+                </h2>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    showToast({
+                      type: 'success',
+                      title: 'PROFILE UPDATED',
+                      message: 'Client credentials saved successfully.',
+                    });
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted uppercase">FIRST NAME</label>
+                      <input
+                        type="text"
+                        value={user.firstName}
+                        onChange={(e) => updateProfile({ firstName: e.target.value })}
+                        className="w-full bg-background border border-border p-2.5 text-foreground"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted uppercase">LAST NAME</label>
+                      <input
+                        type="text"
+                        value={user.lastName}
+                        onChange={(e) => updateProfile({ lastName: e.target.value })}
+                        className="w-full bg-background border border-border p-2.5 text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-muted uppercase">EMAIL ADDRESS</label>
+                    <input
+                      type="email"
+                      value={user.email}
+                      disabled
+                      className="w-full bg-background/50 border border-border p-2.5 text-muted cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <PhoneInput
+                      value={user.phone || ''}
+                      onChange={(p) => updateProfile({ phone: p })}
+                      label="PHONE NUMBER"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90"
+                  >
+                    SAVE PROFILE SETTINGS
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         )}
       </div>
