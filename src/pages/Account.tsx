@@ -56,7 +56,6 @@ export const Account: React.FC = () => {
   const [isGoogleSetupModalOpen, setIsGoogleSetupModalOpen] = useState(false);
   const [customClientIdInput, setCustomClientIdInput] = useState(settings.googleClientId || '');
   const [customGoogleEmail, setCustomGoogleEmail] = useState('');
-  const googleButtonRef = useRef<HTMLDivElement>(null);
 
   // Active Google Client ID (from settings or environment)
   const activeClientId = settings.googleClientId || ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || '';
@@ -74,16 +73,6 @@ export const Account: React.FC = () => {
             auto_select: false,
             cancel_on_tap_outside: true,
           });
-
-          if (googleButtonRef.current) {
-            window.google.accounts.id.renderButton(googleButtonRef.current, {
-              theme: 'outline',
-              size: 'large',
-              width: 380,
-              text: 'continue_with',
-              shape: 'rectangular',
-            });
-          }
         } catch (err) {
           console.error('Google Sign-In initialization error:', err);
         }
@@ -308,32 +297,23 @@ export const Account: React.FC = () => {
               </button>
             </div>
 
-            {/* Google Sign-In Container */}
-            <div className="space-y-2">
-              {activeClientId ? (
-                <div className="flex flex-col items-center">
-                  <div ref={googleButtonRef} className="w-full flex justify-center min-h-[44px]" />
-                </div>
-              ) : null}
-
-              {/* Universal Google Trigger Button */}
-              <button
-                type="button"
-                onClick={handleGoogleButtonClick}
-                disabled={isSubmitting}
-                data-cursor="link"
-                className="w-full py-3.5 bg-surface border border-border hover:border-foreground text-foreground text-xs font-mono tracking-widest uppercase transition-colors flex items-center justify-center space-x-3 group"
-              >
-                <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
-                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
-                  <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"/>
-                  <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 17C3.7 20.7 7.5 24 12 24z"/>
-                </svg>
-                <span>CONTINUE WITH GOOGLE</span>
-                <HelpCircle className="w-3.5 h-3.5 text-muted group-hover:text-foreground ml-1" />
-              </button>
-            </div>
+            {/* Single Clean Google Sign-In Button */}
+            <button
+              type="button"
+              onClick={handleGoogleButtonClick}
+              disabled={isSubmitting}
+              data-cursor="link"
+              className="w-full py-3.5 bg-surface border border-border hover:border-foreground text-foreground text-xs font-mono tracking-widest uppercase transition-colors flex items-center justify-center space-x-3 group"
+            >
+              <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+                <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
+                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
+                <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"/>
+                <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 17C3.7 20.7 7.5 24 12 24z"/>
+              </svg>
+              <span>CONTINUE WITH GOOGLE</span>
+              <HelpCircle className="w-3.5 h-3.5 text-muted group-hover:text-foreground ml-1" />
+            </button>
 
             <div className="relative flex items-center justify-center">
               <div className="w-full border-t border-border" />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion, useSpring, useMotionValue } from 'framer-motion';
+import { motion, useMotionValue } from 'framer-motion';
 import { useTheme } from '../../context/ThemeContext';
 
 export const CustomCursor: React.FC = () => {
@@ -14,11 +14,6 @@ export const CustomCursor: React.FC = () => {
 
   const mouseX = useMotionValue(-100);
   const mouseY = useMotionValue(-100);
-
-  // Smooth spring physics for outer trailing ring
-  const springConfig = { damping: 28, stiffness: 350, mass: 0.4 };
-  const smoothX = useSpring(mouseX, springConfig);
-  const smoothY = useSpring(mouseY, springConfig);
 
   useEffect(() => {
     // Check if device supports fine pointer (mouse/trackpad)
@@ -151,15 +146,16 @@ export const CustomCursor: React.FC = () => {
   const textColor = theme === 'dark' ? '#080808' : '#F6F6F2';
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[999999] select-none">
-      {/* 1. Trailing Outer Ring - Positioned via motion wrapper with nested translate(-50%, -50%) */}
+    <div className="pointer-events-none fixed inset-0 z-[999999] select-none overflow-hidden">
+      {/* Single Shared Coordinate Motion Container (Guarantees dot is 100% physically locked in center of ring) */}
       <motion.div
         style={{
-          x: smoothX,
-          y: smoothY,
+          x: mouseX,
+          y: mouseY,
         }}
         className="fixed top-0 left-0 pointer-events-none"
       >
+        {/* Outer Ring Centered at (0,0) */}
         <div
           style={{
             width: ringSize,
@@ -168,7 +164,7 @@ export const CustomCursor: React.FC = () => {
             backgroundColor: ringBg,
             borderColor: ringBorder,
           }}
-          className="rounded-full border flex items-center justify-center backdrop-blur-[2px] transition-all duration-200"
+          className="absolute top-0 left-0 rounded-full border flex items-center justify-center backdrop-blur-[2px] transition-all duration-200"
         >
           {cursorText && (
             <span
@@ -179,22 +175,14 @@ export const CustomCursor: React.FC = () => {
             </span>
           )}
         </div>
-      </motion.div>
 
-      {/* 2. Center Precise Dot - Positioned via motion wrapper with nested translate(-50%, -50%) */}
-      <motion.div
-        style={{
-          x: mouseX,
-          y: mouseY,
-        }}
-        className="fixed top-0 left-0 pointer-events-none"
-      >
+        {/* Center Dot Locked to Exact Center (0,0) */}
         <div
           style={{
             transform: `translate(-50%, -50%) scale(${dotScale})`,
             backgroundColor: theme === 'dark' ? '#FFFFFF' : '#000000',
           }}
-          className="w-1.5 h-1.5 rounded-full transition-transform duration-100"
+          className="absolute top-0 left-0 w-1.5 h-1.5 rounded-full transition-transform duration-100"
         />
       </motion.div>
     </div>
