@@ -97,9 +97,10 @@ export interface PaymentGatewaysConfig {
 export interface StoreSettings {
   announcementText: string;
   freeShippingThreshold: number;
-  storeName: string;
+  storeName?: string;
   discountCode: string;
   discountPercentage: number;
+  googleClientId?: string;
   gateways: PaymentGatewaysConfig;
 }
 
@@ -149,6 +150,7 @@ const DEFAULT_SETTINGS: StoreSettings = {
   storeName: 'ATELIER ECOVANTO',
   discountCode: 'ATELIER10',
   discountPercentage: 10,
+  googleClientId: '',
   gateways: DEFAULT_GATEWAYS,
 };
 

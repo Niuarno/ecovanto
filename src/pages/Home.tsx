@@ -15,7 +15,7 @@ export const Home: React.FC = () => {
   const newArrivals = products.filter((p) => p.isNewArrival || p.isFeatured);
 
   return (
-    <div className="min-h-screen bg-[#080808]">
+    <div className="min-h-screen bg-background transition-colors duration-300">
       {/* 01. FULLSCREEN HERO */}
       <HeroSection />
 

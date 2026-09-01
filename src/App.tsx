@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { MobileMenu } from './components/layout/MobileMenu';
@@ -104,8 +104,9 @@ export const App: React.FC = () => {
             <Route path="/orders" element={<OrdersLookup />} />
             <Route path="/orders/:id" element={<OrderDetail />} />
 
-            {/* Hidden & Protected Atelier Management Portal */}
-            <Route path="/admin" element={<Admin />} />
+            {/* Private Host Atelier Management Route */}
+            <Route path="/host" element={<Admin />} />
+            <Route path="/admin" element={<Navigate to="/host" replace />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

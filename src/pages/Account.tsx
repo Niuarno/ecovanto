@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useStore } from '../context/StoreContext';
 import { useFavorites } from '../context/FavoritesContext';
@@ -6,6 +6,7 @@ import { useUI } from '../context/UIContext';
 import { Link } from 'react-router-dom';
 import { PhoneInput } from '../components/common/PhoneInput';
 import { CountrySelect } from '../components/common/CountrySelect';
+import { jwtDecode } from 'jwt-decode';
 import {
   User,
   ShoppingBag,
@@ -16,11 +17,30 @@ import {
   ArrowRight,
   ShieldCheck,
   Check,
+  X,
+  Key,
+  ExternalLink,
+  HelpCircle,
 } from 'lucide-react';
+
+interface GoogleTokenPayload {
+  email: string;
+  name: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+  sub: string;
+}
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
 
 export const Account: React.FC = () => {
   const { user, isAuthenticated, login, loginWithGmail, register, logout, updateProfile } = useAuth();
-  const { orders } = useStore();
+  const { orders, settings, updateSettings } = useStore();
   const { favorites } = useFavorites();
   const { showToast } = useUI();
 
@@ -32,15 +52,164 @@ export const Account: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Address edit in profile
-  const [isEditingAddress, setIsEditingAddress] = useState(false);
-  const [addressForm, setAddressForm] = useState({
-    address: user?.defaultAddress?.address || 'Auguststraße 14',
-    apartment: user?.defaultAddress?.apartment || '',
-    city: user?.defaultAddress?.city || 'Berlin',
-    postalCode: user?.defaultAddress?.postalCode || '10117',
-    country: user?.defaultAddress?.country || 'Germany',
-  });
+  // Google OAuth Setup & Setup Modal State
+  const [isGoogleSetupModalOpen, setIsGoogleSetupModalOpen] = useState(false);
+  const [customClientIdInput, setCustomClientIdInput] = useState(settings.googleClientId || '');
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+
+  // Active Google Client ID (from settings or environment)
+  const activeClientId = settings.googleClientId || ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID) || '';
+
+  // Initialize Real Google Identity Services when Client ID is available
+  useEffect(() => {
+    if (!activeClientId) return;
+
+    const initializeGoogle = () => {
+      if (window.google?.accounts?.id) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: activeClientId,
+            callback: handleGoogleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+
+          if (googleButtonRef.current) {
+            window.google.accounts.id.renderButton(googleButtonRef.current, {
+              theme: 'outline',
+              size: 'large',
+              width: 380,
+              text: 'continue_with',
+              shape: 'rectangular',
+            });
+          }
+        } catch (err) {
+          console.error('Google Sign-In initialization error:', err);
+        }
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      initializeGoogle();
+    } else {
+      const interval = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          initializeGoogle();
+          clearInterval(interval);
+        }
+      }, 300);
+      return () => clearInterval(interval);
+    }
+  }, [activeClientId, isAuthenticated]);
+
+  // Handle Real Google JWT Credential Response
+  const handleGoogleCredentialResponse = (response: any) => {
+    try {
+      if (!response.credential) return;
+      const decoded = jwtDecode<GoogleTokenPayload>(response.credential);
+
+      const realGoogleUser = {
+        id: `usr-google-${decoded.sub || Date.now()}`,
+        email: decoded.email,
+        firstName: decoded.given_name || decoded.name.split(' ')[0] || 'Client',
+        lastName: decoded.family_name || decoded.name.split(' ').slice(1).join(' ') || 'Atelier',
+        avatarUrl: decoded.picture,
+        isGmailAuth: true,
+        createdAt: new Date().toISOString(),
+        defaultAddress: {
+          address: 'Auguststraße 14',
+          city: 'Berlin',
+          postalCode: '10117',
+          country: 'Germany',
+        },
+      };
+
+      updateProfile(realGoogleUser);
+      setIsGoogleSetupModalOpen(false);
+      showToast({
+        type: 'success',
+        title: 'AUTHENTICATED VIA GOOGLE',
+        message: `Signed in as ${realGoogleUser.firstName} ${realGoogleUser.lastName} (${realGoogleUser.email}).`,
+      });
+    } catch (err) {
+      console.error('Failed to parse Google OAuth credential:', err);
+      showToast({
+        type: 'error',
+        title: 'GOOGLE SIGN-IN FAILED',
+        message: 'Could not decode Google token. Please try again.',
+      });
+    }
+  };
+
+  // Trigger Google Login Popup or open setup guide
+  const handleGoogleButtonClick = () => {
+    if (activeClientId && window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            setIsGoogleSetupModalOpen(true);
+          }
+        });
+      } catch {
+        setIsGoogleSetupModalOpen(true);
+      }
+    } else {
+      setIsGoogleSetupModalOpen(true);
+    }
+  };
+
+  const handleSaveGoogleClientId = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customClientIdInput.trim()) return;
+
+    updateSettings({ googleClientId: customClientIdInput.trim() });
+    showToast({
+      type: 'success',
+      title: 'GOOGLE CLIENT ID SAVED',
+      message: 'Official Google OAuth credentials updated.',
+    });
+  };
+
+  const handleDemoSignIn = async (demoEmail?: string) => {
+    setIsSubmitting(true);
+    setIsGoogleSetupModalOpen(false);
+
+    if (demoEmail && demoEmail.includes('@')) {
+      const namePart = demoEmail.split('@')[0];
+      const customUser = {
+        id: `usr-gmail-${Date.now()}`,
+        email: demoEmail,
+        firstName: namePart.charAt(0).toUpperCase() + namePart.slice(1),
+        lastName: 'Client',
+        isGmailAuth: true,
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+        phone: '+49 171 000000',
+        createdAt: new Date().toISOString(),
+        defaultAddress: {
+          address: 'Torstraße 84',
+          city: 'Berlin',
+          postalCode: '10119',
+          country: 'Germany',
+        },
+      };
+      updateProfile(customUser);
+      showToast({
+        type: 'success',
+        title: 'GOOGLE AUTHENTICATED',
+        message: `Signed in as ${demoEmail}.`,
+      });
+    } else {
+      const gmailUser = await loginWithGmail();
+      showToast({
+        type: 'success',
+        title: 'GOOGLE AUTHENTICATED',
+        message: `Signed in as ${gmailUser.firstName} ${gmailUser.lastName} (${gmailUser.email}).`,
+      });
+    }
+
+    setIsSubmitting(false);
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +220,7 @@ export const Account: React.FC = () => {
     showToast({
       type: 'success',
       title: 'WELCOME BACK',
-      message: `Signed in to Atelier account as ${email}.`,
+      message: `Signed in as ${email}.`,
     });
   };
 
@@ -68,16 +237,15 @@ export const Account: React.FC = () => {
     });
   };
 
-  const handleGmailClick = async () => {
-    setIsSubmitting(true);
-    const gmailUser = await loginWithGmail();
-    setIsSubmitting(false);
-    showToast({
-      type: 'success',
-      title: 'GOOGLE AUTHENTICATED',
-      message: `Signed in as ${gmailUser.firstName} ${gmailUser.lastName} (${gmailUser.email}).`,
-    });
-  };
+  // Address edit in profile
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [addressForm, setAddressForm] = useState({
+    address: user?.defaultAddress?.address || 'Auguststraße 14',
+    apartment: user?.defaultAddress?.apartment || '',
+    city: user?.defaultAddress?.city || 'Berlin',
+    postalCode: user?.defaultAddress?.postalCode || '10117',
+    country: user?.defaultAddress?.country || 'Germany',
+  });
 
   const handleSaveAddress = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +258,6 @@ export const Account: React.FC = () => {
     });
   };
 
-  // Filter user orders by email if matching or show all recent customer orders
   const customerOrders = orders.filter(
     (o) => !user || o.customer.email.toLowerCase() === user.email.toLowerCase() || o.customer.lastName.toLowerCase() === user.lastName.toLowerCase()
   );
@@ -99,7 +266,7 @@ export const Account: React.FC = () => {
     <div className="min-h-screen bg-background pt-28 md:pt-36 pb-24 text-foreground select-none transition-colors duration-300">
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 lg:px-12">
         {!isAuthenticated || !user ? (
-          /* Authentication Screen (Login / Register / Gmail) */
+          /* Authentication Screen */
           <div className="max-w-md mx-auto space-y-8">
             <div className="text-center space-y-2">
               <span className="text-[10px] font-mono tracking-[0.25em] text-muted uppercase">
@@ -141,34 +308,32 @@ export const Account: React.FC = () => {
               </button>
             </div>
 
-            {/* Instant Gmail Login Button */}
-            <button
-              type="button"
-              onClick={handleGmailClick}
-              disabled={isSubmitting}
-              data-cursor="link"
-              className="w-full py-3.5 bg-surface border border-border hover:border-foreground text-foreground text-xs font-mono tracking-widest uppercase transition-colors flex items-center justify-center space-x-3 group"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path
-                  fill="#EA4335"
-                  d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
-                />
-                <path
-                  fill="#4285F4"
-                  d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 17C3.7 20.7 7.5 24 12 24z"
-                />
-              </svg>
-              <span>CONTINUE WITH GMAIL</span>
-            </button>
+            {/* Google Sign-In Container */}
+            <div className="space-y-2">
+              {activeClientId ? (
+                <div className="flex flex-col items-center">
+                  <div ref={googleButtonRef} className="w-full flex justify-center min-h-[44px]" />
+                </div>
+              ) : null}
+
+              {/* Universal Google Trigger Button */}
+              <button
+                type="button"
+                onClick={handleGoogleButtonClick}
+                disabled={isSubmitting}
+                data-cursor="link"
+                className="w-full py-3.5 bg-surface border border-border hover:border-foreground text-foreground text-xs font-mono tracking-widest uppercase transition-colors flex items-center justify-center space-x-3 group"
+              >
+                <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
+                  <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
+                  <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"/>
+                  <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 17C3.7 20.7 7.5 24 12 24z"/>
+                </svg>
+                <span>CONTINUE WITH GOOGLE</span>
+                <HelpCircle className="w-3.5 h-3.5 text-muted group-hover:text-foreground ml-1" />
+              </button>
+            </div>
 
             <div className="relative flex items-center justify-center">
               <div className="w-full border-t border-border" />
@@ -294,6 +459,114 @@ export const Account: React.FC = () => {
                 </button>
               </form>
             )}
+
+            {/* Google OAuth Configuration & Live Account Chooser Modal */}
+            {isGoogleSetupModalOpen && (
+              <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+                <div
+                  className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+                  onClick={() => setIsGoogleSetupModalOpen(false)}
+                />
+                <div className="relative w-full max-w-lg bg-surface border border-border p-6 md:p-8 space-y-6 shadow-2xl z-10 text-foreground max-h-[90vh] overflow-y-auto">
+                  <div className="flex justify-between items-center pb-3 border-b border-border">
+                    <div className="flex items-center space-x-2">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24">
+                        <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"/>
+                        <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
+                        <path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"/>
+                        <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 17C3.7 20.7 7.5 24 12 24z"/>
+                      </svg>
+                      <h2 className="text-sm font-mono uppercase tracking-wider font-semibold">
+                        REAL GOOGLE / GMAIL SIGN-IN
+                      </h2>
+                    </div>
+                    <button onClick={() => setIsGoogleSetupModalOpen(false)} className="text-muted hover:text-foreground">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Instructions on how to get real Google Client ID */}
+                  <div className="p-4 bg-background border border-border space-y-3 text-xs font-mono">
+                    <span className="text-foreground font-semibold uppercase flex items-center space-x-1.5">
+                      <Key className="w-4 h-4 text-emerald-400" />
+                      <span>HOW TO ENABLE REAL GOOGLE AUTH (3 STEPS):</span>
+                    </span>
+                    <ol className="space-y-2 text-[11px] text-muted list-decimal list-inside leading-relaxed">
+                      <li>
+                        Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-foreground underline inline-flex items-center">Google Cloud Console <ExternalLink className="w-3 h-3 ml-0.5" /></a> (Free).
+                      </li>
+                      <li>
+                        Create an <strong>OAuth 2.0 Client ID (Web Application)</strong>.
+                      </li>
+                      <li>
+                        Add <code>http://localhost:5173</code> to <strong>Authorized JavaScript origins</strong> and paste your Client ID below:
+                      </li>
+                    </ol>
+
+                    <form onSubmit={handleSaveGoogleClientId} className="flex gap-2 pt-2">
+                      <input
+                        type="text"
+                        value={customClientIdInput}
+                        onChange={(e) => setCustomClientIdInput(e.target.value)}
+                        placeholder="PASTE GOOGLE CLIENT ID (e.g. 123...apps.googleusercontent.com)"
+                        className="flex-1 bg-surface border border-border p-2 text-[11px] text-foreground font-mono focus:outline-none focus:border-foreground"
+                      />
+                      <button
+                        type="submit"
+                        className="px-3 py-2 bg-foreground text-background text-xs font-mono uppercase tracking-wider font-semibold"
+                      >
+                        SAVE
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Immediate One-Click Test Accounts */}
+                  <div className="space-y-3 pt-2">
+                    <span className="text-[10px] font-mono tracking-widest text-muted uppercase block">
+                      OR INSTANT CLIENT SIMULATION
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDemoSignIn()}
+                      className="w-full p-3 bg-background border border-border hover:border-foreground text-left flex items-center space-x-3 transition-colors group"
+                    >
+                      <img
+                        src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80"
+                        alt="Elena Voss"
+                        className="w-9 h-9 rounded-full object-cover border border-border"
+                      />
+                      <div className="flex-1 truncate">
+                        <div className="text-xs font-mono text-foreground font-semibold uppercase">
+                          Elena Voss (Verified Google Client)
+                        </div>
+                        <div className="text-[11px] font-mono text-muted truncate">
+                          client.atelier@gmail.com
+                        </div>
+                      </div>
+                    </button>
+
+                    <div className="flex space-x-2 pt-1">
+                      <input
+                        type="email"
+                        value={customGoogleEmail}
+                        onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                        placeholder="ENTER YOUR OWN GMAIL (e.g. you@gmail.com)"
+                        className="flex-1 bg-background border border-border p-2 text-xs font-mono text-foreground placeholder-muted focus:outline-none focus:border-foreground"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDemoSignIn(customGoogleEmail)}
+                        disabled={!customGoogleEmail.includes('@')}
+                        className="px-4 py-2 bg-foreground text-background text-xs font-mono uppercase tracking-wider font-semibold disabled:opacity-40"
+                      >
+                        SIGN IN
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* Authenticated Profile Dashboard */
@@ -319,7 +592,7 @@ export const Account: React.FC = () => {
                     </span>
                     {user.isGmailAuth && (
                       <span className="text-[9px] font-mono px-1.5 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800 uppercase">
-                        GMAIL VERIFIED
+                        GOOGLE VERIFIED
                       </span>
                     )}
                   </div>
@@ -333,7 +606,7 @@ export const Account: React.FC = () => {
               <button
                 onClick={logout}
                 data-cursor="link"
-                className="px-6 py-2.5 border border-border hover:border-red-400 text-muted hover:text-red-400 font-mono text-xs uppercase tracking-widest transition-colors flex items-center space-x-2 self-start md:self-auto"
+                className="px-6 py-2.5 border border-border hover:border-red-400 text-muted hover:text-red-400 font-mono text-xs uppercase tracking-widest transition-colors flex items-center space-x-2 self-start md:self-auto font-semibold"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>LOGOUT</span>
@@ -393,7 +666,7 @@ export const Account: React.FC = () => {
                     </p>
                     <Link
                       to="/shop"
-                      className="inline-block px-6 py-3 bg-foreground text-background font-mono text-xs uppercase tracking-widest"
+                      className="inline-block px-6 py-3 bg-foreground text-background font-mono text-xs uppercase tracking-widest font-semibold"
                     >
                       ACQUIRE FIRST GARMENT
                     </Link>
@@ -408,7 +681,7 @@ export const Account: React.FC = () => {
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
                             <span className="font-semibold text-foreground">#{ord.orderNumber}</span>
-                            <span className="text-[9px] px-1.5 py-0.5 bg-surface-elevated text-foreground uppercase border border-border">
+                            <span className="text-[9px] px-1.5 py-0.5 bg-surface-subtle text-foreground uppercase border border-border">
                               {ord.status}
                             </span>
                           </div>

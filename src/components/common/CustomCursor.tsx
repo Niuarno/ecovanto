@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, useSpring, useMotionValue } from 'framer-motion';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -15,8 +15,8 @@ export const CustomCursor: React.FC = () => {
   const mouseX = useMotionValue(-100);
   const mouseY = useMotionValue(-100);
 
-  // Smooth springs for trailing outer ring
-  const springConfig = { damping: 28, stiffness: 350, mass: 0.5 };
+  // Smooth spring physics for outer trailing ring
+  const springConfig = { damping: 28, stiffness: 350, mass: 0.4 };
   const smoothX = useSpring(mouseX, springConfig);
   const smoothY = useSpring(mouseY, springConfig);
 
@@ -115,7 +115,7 @@ export const CustomCursor: React.FC = () => {
   // Determine size, styling, and text based on active state
   let ringSize = 28;
   let ringBg = 'transparent';
-  let ringBorder = theme === 'dark' ? 'rgba(244, 244, 240, 0.4)' : 'rgba(10, 10, 10, 0.4)';
+  let ringBorder = theme === 'dark' ? 'rgba(244, 244, 240, 0.45)' : 'rgba(10, 10, 10, 0.45)';
   let dotScale = 1;
 
   if (cursorType === 'link') {
@@ -151,51 +151,52 @@ export const CustomCursor: React.FC = () => {
   const textColor = theme === 'dark' ? '#080808' : '#F6F6F2';
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[999999] overflow-hidden select-none">
-      {/* Trailing Outer Reactive Ring */}
+    <div className="pointer-events-none fixed inset-0 z-[999999] select-none">
+      {/* 1. Trailing Outer Ring - Positioned via motion wrapper with nested translate(-50%, -50%) */}
       <motion.div
         style={{
           x: smoothX,
           y: smoothY,
-          translateX: '-50%',
-          translateY: '-50%',
         }}
-        animate={{
-          width: ringSize,
-          height: ringSize,
-          backgroundColor: ringBg,
-          borderColor: ringBorder,
-        }}
-        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        className="rounded-full border flex items-center justify-center backdrop-blur-[2px] transition-colors"
+        className="fixed top-0 left-0 pointer-events-none"
       >
-        {cursorText && (
-          <motion.span
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-[9px] font-mono tracking-widest uppercase font-bold"
-            style={{ color: textColor }}
-          >
-            {cursorText}
-          </motion.span>
-        )}
+        <div
+          style={{
+            width: ringSize,
+            height: ringSize,
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: ringBg,
+            borderColor: ringBorder,
+          }}
+          className="rounded-full border flex items-center justify-center backdrop-blur-[2px] transition-all duration-200"
+        >
+          {cursorText && (
+            <span
+              className="text-[9px] font-mono tracking-widest uppercase font-bold select-none text-center"
+              style={{ color: textColor }}
+            >
+              {cursorText}
+            </span>
+          )}
+        </div>
       </motion.div>
 
-      {/* Center Precise Dot */}
+      {/* 2. Center Precise Dot - Positioned via motion wrapper with nested translate(-50%, -50%) */}
       <motion.div
         style={{
           x: mouseX,
           y: mouseY,
-          translateX: '-50%',
-          translateY: '-50%',
         }}
-        animate={{
-          scale: dotScale,
-          backgroundColor: theme === 'dark' ? '#FFFFFF' : '#000000',
-        }}
-        transition={{ duration: 0.15 }}
-        className="w-1.5 h-1.5 rounded-full"
-      />
+        className="fixed top-0 left-0 pointer-events-none"
+      >
+        <div
+          style={{
+            transform: `translate(-50%, -50%) scale(${dotScale})`,
+            backgroundColor: theme === 'dark' ? '#FFFFFF' : '#000000',
+          }}
+          className="w-1.5 h-1.5 rounded-full transition-transform duration-100"
+        />
+      </motion.div>
     </div>
   );
 };

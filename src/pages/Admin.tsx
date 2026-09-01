@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore, Order, PaymentGatewaysConfig } from '../context/StoreContext';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
@@ -21,9 +21,7 @@ import {
   AlertTriangle,
   Lock,
   Upload,
-  Image as ImageIcon,
-  Key,
-  Shield,
+  ArrowUpRight,
   LogOut,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -97,11 +95,19 @@ export const Admin: React.FC = () => {
   // Manual URL input helper for product form
   const [singleImageUrlInput, setSingleImageUrlInput] = useState('');
 
-  // Gateways form state
+  // Gateways form state - synced with store settings
   const [gatewaysForm, setGatewaysForm] = useState<PaymentGatewaysConfig>(settings.gateways);
+
+  useEffect(() => {
+    setGatewaysForm(settings.gateways);
+  }, [settings.gateways]);
 
   // General settings form state
   const [settingsForm, setSettingsForm] = useState(settings);
+
+  useEffect(() => {
+    setSettingsForm(settings);
+  }, [settings]);
 
   // Financial Metrics
   const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
@@ -363,7 +369,7 @@ export const Admin: React.FC = () => {
     showToast({
       type: 'success',
       title: 'PAYMENT GATEWAYS SAVED',
-      message: 'Active checkout credentials updated. Empty gateways will be hidden.',
+      message: 'Checkout payment credentials updated. Inactive or empty gateways are now hidden.',
     });
   };
 
@@ -379,6 +385,15 @@ export const Admin: React.FC = () => {
 
   const allSizes: Size[] = ['XS', 'S', 'M', 'L', 'XL', 'ONE SIZE'];
 
+  // Helper function to check if gateway is active on frontend
+  const isStripeActive = gatewaysForm.stripe.enabled && !!gatewaysForm.stripe.publishableKey.trim();
+  const isPayPalActive = gatewaysForm.paypal.enabled && !!gatewaysForm.paypal.clientId.trim();
+  const isCardsActive = gatewaysForm.directCards.enabled && !!gatewaysForm.directCards.merchantId.trim();
+  const isApplePayActive = gatewaysForm.applePay.enabled && !!gatewaysForm.applePay.merchantIdentifier.trim();
+  const isGooglePayActive = gatewaysForm.googlePay.enabled && !!gatewaysForm.googlePay.merchantId.trim();
+  const isAmazonPayActive = gatewaysForm.amazonPay.enabled && !!gatewaysForm.amazonPay.merchantId.trim();
+  const isBankWireActive = gatewaysForm.bankWire.enabled && !!gatewaysForm.bankWire.iban.trim();
+
   return (
     <div className="min-h-screen bg-background pt-24 md:pt-32 pb-24 text-foreground select-none transition-colors duration-300">
       <div className="max-w-[1800px] mx-auto px-4 md:px-8 lg:px-12">
@@ -386,7 +401,7 @@ export const Admin: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-end justify-between pb-8 mb-8 border-b border-border gap-4">
           <div>
             <div className="flex items-center space-x-3 text-[10px] font-mono tracking-[0.25em] text-muted uppercase mb-1.5">
-              <span>ADMINISTRATIVE PORTAL</span>
+              <span>PRIVATE HOST PORTAL</span>
               <span>•</span>
               <span className="text-emerald-400">AUTHORIZED SESSION</span>
             </div>
@@ -419,7 +434,7 @@ export const Admin: React.FC = () => {
               onClick={adminLogout}
               data-cursor="link"
               className="p-2.5 border border-border hover:border-red-400 text-muted hover:text-red-400 transition-colors"
-              title="Lock Admin Portal"
+              title="Lock Host Portal"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -773,16 +788,27 @@ export const Admin: React.FC = () => {
         {/* TAB 4: PAYMENT GATEWAYS CONFIGURATION */}
         {activeTab === 'gateways' && (
           <form onSubmit={handleSaveGateways} className="space-y-8 max-w-4xl bg-surface border border-border p-6 md:p-10 text-xs font-mono">
-            <div className="pb-4 border-b border-border">
-              <span className="text-[10px] font-mono tracking-widest text-muted uppercase block mb-1">
-                API CREDENTIALS & VISIBILITY
-              </span>
-              <h2 className="text-lg font-light font-display uppercase tracking-widest text-foreground">
-                PAYMENT GATEWAYS CONFIGURATION
-              </h2>
-              <p className="text-xs text-muted font-normal mt-1 leading-relaxed">
-                Configure your payment gateway merchant API keys below. <strong className="text-foreground">Rule:</strong> If any gateway is left empty or unchecked, it will automatically be hidden from the customer checkout front-end.
-              </p>
+            <div className="pb-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-mono tracking-widest text-muted uppercase block mb-1">
+                  API CREDENTIALS & LIVE ACTIVATION
+                </span>
+                <h2 className="text-lg font-light font-display uppercase tracking-widest text-foreground">
+                  PAYMENT GATEWAYS CONFIGURATION
+                </h2>
+                <p className="text-xs text-muted font-normal mt-1 leading-relaxed">
+                  Enter your credentials below. Any payment gateway left empty or unchecked will <strong className="text-foreground">automatically disappear</strong> from the customer checkout.
+                </p>
+              </div>
+
+              <Link
+                to="/checkout"
+                target="_blank"
+                className="px-4 py-2 bg-surface-subtle hover:bg-foreground hover:text-background border border-border text-foreground uppercase tracking-wider flex items-center space-x-1.5 self-start sm:self-auto flex-shrink-0"
+              >
+                <span>PREVIEW CHECKOUT</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
 
             {/* 1. STRIPE */}
@@ -790,7 +816,11 @@ export const Admin: React.FC = () => {
               <div className="flex items-center justify-between pb-2 border-b border-border">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm font-semibold uppercase text-foreground">01 / STRIPE</span>
-                  <span className="text-[10px] text-muted">(Credit/Debit Cards, Apple Pay, Google Pay)</span>
+                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
+                    isStripeActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
+                  }`}>
+                    {isStripeActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
+                  </span>
                 </div>
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
@@ -830,7 +860,14 @@ export const Admin: React.FC = () => {
             {/* 2. PAYPAL */}
             <div className="p-6 bg-background border border-border space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-border">
-                <span className="text-sm font-semibold uppercase text-foreground">02 / PAYPAL EXPRESS</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold uppercase text-foreground">02 / PAYPAL EXPRESS</span>
+                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
+                    isPayPalActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
+                  }`}>
+                    {isPayPalActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
+                  </span>
+                </div>
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -869,7 +906,14 @@ export const Admin: React.FC = () => {
             {/* 3. DIRECT CREDIT / DEBIT CARDS */}
             <div className="p-6 bg-background border border-border space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-border">
-                <span className="text-sm font-semibold uppercase text-foreground">03 / DIRECT MERCHANT CARDS</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold uppercase text-foreground">03 / DIRECT MERCHANT CARDS</span>
+                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
+                    isCardsActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
+                  }`}>
+                    {isCardsActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
+                  </span>
+                </div>
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -908,7 +952,14 @@ export const Admin: React.FC = () => {
             {/* 4. APPLE PAY */}
             <div className="p-6 bg-background border border-border space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-border">
-                <span className="text-sm font-semibold uppercase text-foreground">04 / APPLE PAY</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold uppercase text-foreground">04 / APPLE PAY</span>
+                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
+                    isApplePayActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
+                  }`}>
+                    {isApplePayActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
+                  </span>
+                </div>
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -935,7 +986,14 @@ export const Admin: React.FC = () => {
             {/* 5. GOOGLE PAY */}
             <div className="p-6 bg-background border border-border space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-border">
-                <span className="text-sm font-semibold uppercase text-foreground">05 / GOOGLE PAY</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold uppercase text-foreground">05 / GOOGLE PAY</span>
+                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
+                    isGooglePayActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
+                  }`}>
+                    {isGooglePayActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
+                  </span>
+                </div>
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -974,7 +1032,14 @@ export const Admin: React.FC = () => {
             {/* 6. AMAZON PAY */}
             <div className="p-6 bg-background border border-border space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-border">
-                <span className="text-sm font-semibold uppercase text-foreground">06 / AMAZON PAY</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold uppercase text-foreground">06 / AMAZON PAY</span>
+                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
+                    isAmazonPayActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
+                  }`}>
+                    {isAmazonPayActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
+                  </span>
+                </div>
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1013,7 +1078,14 @@ export const Admin: React.FC = () => {
             {/* 7. BANK WIRE / SEPA */}
             <div className="p-6 bg-background border border-border space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-border">
-                <span className="text-sm font-semibold uppercase text-foreground">07 / SEPA BANK WIRE</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold uppercase text-foreground">07 / SEPA BANK WIRE</span>
+                  <span className={`text-[9px] font-mono px-2 py-0.5 border ${
+                    isBankWireActive ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-surface text-muted border-border'
+                  }`}>
+                    {isBankWireActive ? '● ACTIVE ON CHECKOUT' : '○ INACTIVE (HIDDEN)'}
+                  </span>
+                </div>
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1114,6 +1186,32 @@ export const Admin: React.FC = () => {
                 onChange={(e) => setSettingsForm((p) => ({ ...p, discountPercentage: Number(e.target.value) }))}
                 className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground"
               />
+            </div>
+
+            <div className="space-y-1.5 pt-2 border-t border-border">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-foreground font-semibold uppercase block">
+                  OFFICIAL GOOGLE OAUTH CLIENT ID (FOR REAL GMAIL SIGN-IN)
+                </label>
+                <a
+                  href="https://console.cloud.google.com/apis/credentials"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-muted hover:text-foreground underline uppercase"
+                >
+                  GET FREE KEY ON GOOGLE CLOUD ↗
+                </a>
+              </div>
+              <input
+                type="text"
+                value={settingsForm.googleClientId || ''}
+                onChange={(e) => setSettingsForm((p) => ({ ...p, googleClientId: e.target.value }))}
+                placeholder="YOUR_CLIENT_ID.apps.googleusercontent.com"
+                className="w-full bg-background border border-border p-3 text-foreground focus:outline-none focus:border-foreground font-mono text-xs"
+              />
+              <span className="text-[10px] text-muted block leading-relaxed">
+                Add <code>http://localhost:5173</code> under "Authorized JavaScript origins" in your Google Cloud Console project. When populated, customer accounts will open the real Google authentication popup window.
+              </span>
             </div>
 
             <button

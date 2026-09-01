@@ -29,23 +29,23 @@ export const FAQ: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#080808] pt-28 md:pt-36 pb-24 text-[#F4F4F0] select-none">
+    <div className="min-h-screen bg-background pt-28 md:pt-36 pb-24 text-foreground select-none transition-colors duration-300">
       <div className="max-w-4xl mx-auto px-4 md:px-8">
-        <div className="pb-8 mb-12 border-b border-white/10">
-          <span className="text-[10px] font-mono tracking-[0.25em] text-[#8A8A8A] uppercase block mb-2">
+        <div className="pb-8 mb-12 border-b border-border">
+          <span className="text-[10px] font-mono tracking-[0.25em] text-muted uppercase block mb-2">
             CLIENT ASSISTANCE
           </span>
-          <h1 className="text-3xl sm:text-5xl font-light font-display tracking-[0.15em] uppercase text-white">
+          <h1 className="text-3xl sm:text-5xl font-light font-display tracking-[0.15em] uppercase text-foreground">
             FREQUENTLY ASKED QUESTIONS
           </h1>
         </div>
 
-        <div className="divide-y divide-white/10 text-xs font-mono">
+        <div className="divide-y divide-border text-xs font-mono">
           {faqs.map((item, idx) => (
             <div key={idx} className="py-6">
               <button
                 onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
-                className="w-full flex justify-between items-start text-left text-sm font-medium uppercase text-white hover:text-[#AAA] transition-colors gap-4"
+                className="w-full flex justify-between items-start text-left text-sm font-medium uppercase text-foreground hover:opacity-80 transition-opacity gap-4"
               >
                 <span>{item.q}</span>
                 <ChevronDown
@@ -56,7 +56,7 @@ export const FAQ: React.FC = () => {
               </button>
 
               {openIndex === idx && (
-                <p className="mt-4 text-xs font-light text-[#A0A09C] leading-relaxed pr-6">
+                <p className="mt-4 text-xs font-light text-foreground-secondary leading-relaxed pr-6">
                   {item.a}
                 </p>
               )}
@@ -64,14 +64,14 @@ export const FAQ: React.FC = () => {
           ))}
         </div>
 
-        <div className="mt-16 p-6 bg-[#0E0E0E] border border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-mono">
+        <div className="mt-16 p-6 bg-surface border border-border flex flex-col sm:flex-row justify-between items-center gap-4 text-xs font-mono">
           <div>
-            <span className="text-white block font-medium">REQUIRE FURTHER ASSISTANCE?</span>
-            <span className="text-[#8A8A8A]">Our concierge responds within 24 hours.</span>
+            <span className="text-foreground block font-medium">REQUIRE FURTHER ASSISTANCE?</span>
+            <span className="text-muted">Our concierge responds within 24 hours.</span>
           </div>
           <Link
             to="/contact"
-            className="px-6 py-3 bg-white text-black uppercase tracking-widest hover:bg-neutral-200 transition-colors"
+            className="px-6 py-3 bg-foreground text-background uppercase tracking-widest hover:opacity-90 transition-opacity font-semibold"
           >
             CONTACT CONCIERGE
           </Link>
