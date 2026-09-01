@@ -106,7 +106,7 @@ export const App: React.FC = () => {
 
             {/* Private Host Atelier Management Route */}
             <Route path="/host" element={<Admin />} />
-            <Route path="/admin" element={<Navigate to="/host" replace />} />
+            <Route path="/admin" element={<Admin />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
