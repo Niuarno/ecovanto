@@ -3,7 +3,6 @@ import { useStore, Order, PaymentGatewaysConfig, HeroSettings, DEFAULT_HERO } fr
 import { useAuth, UserProfile } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
 import { Product, Size, Category } from '../types';
-import { COLLECTIONS } from '../data/collections';
 import {
   Package,
   ShoppingBag,
@@ -17,7 +16,6 @@ import {
   TrendingUp,
   CreditCard,
   Eye,
-  AlertTriangle,
   Lock,
   Upload,
   ArrowUpRight,
@@ -27,6 +25,21 @@ import {
   Layers,
   Sparkles,
   Share2,
+  Calendar,
+  Filter,
+  Search,
+  ChevronDown,
+  Bell,
+  Settings as SettingsIcon,
+  DollarSign,
+  FileText,
+  Clock,
+  ArrowRight,
+  ExternalLink,
+  ShieldCheck,
+  CheckCircle2,
+  MoreVertical,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -60,13 +73,28 @@ export const Admin: React.FC = () => {
   const [passcode, setPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState(false);
 
+  // Active Main Navigation Tab (Pill Bar)
   const [activeTab, setActiveTab] = useState<
     'overview' | 'products' | 'categories' | 'hero' | 'orders' | 'customers' | 'gateways' | 'settings'
-  >('overview');
+  >('orders');
 
-  // Product Modal State
+  // Selected Order for Inspector Card
+  const [selectedOrderId, setSelectedOrderId] = useState<string>(orders[0]?.id || '');
+  const selectedOrder = orders.find((o) => o.id === selectedOrderId) || orders[0];
+
+  // Selected Product for Inspector
+  const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id || '');
+  const selectedProduct = products.find((p) => p.id === selectedProductId) || products[0];
+
+  // Active Status Sub-filter in Bottom Deck
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'dispatched' | 'delivered'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Modals State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
   // Form State for Add/Edit Product
   const [productForm, setProductForm] = useState<{
@@ -108,9 +136,7 @@ export const Admin: React.FC = () => {
     stock: 8,
   });
 
-  // Category Modal State
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  // Form State for Categories
   const [categoryForm, setCategoryForm] = useState({
     name: '',
     slug: '',
@@ -120,21 +146,14 @@ export const Admin: React.FC = () => {
     editorialQuote: '',
   });
 
-  // Hero Form State
+  // Form State for Hero
   const [heroForm, setHeroForm] = useState<HeroSettings>(hero || DEFAULT_HERO);
-
-  // Sync heroForm whenever hero changes in store
   useEffect(() => {
     if (hero) setHeroForm(hero);
   }, [hero]);
 
-  // Customer search filter
-  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
-
-  // Gateways form state
+  // Form State for Gateways & Settings
   const [gatewaysForm, setGatewaysForm] = useState<PaymentGatewaysConfig>(settings.gateways);
-
-  // Settings form state
   const [settingsForm, setSettingsForm] = useState({
     announcementText: settings.announcementText,
     freeShippingThreshold: settings.freeShippingThreshold,
@@ -145,10 +164,12 @@ export const Admin: React.FC = () => {
     facebookPixelId: settings.facebookPixelId || '',
   });
 
-  // Temporary Image URL Input
   const [tempImageUrl, setTempImageUrl] = useState('');
 
-  // File Upload Helper to convert local images to Base64 data URLs
+  // Selected payment pill in analytics card
+  const [selectedVaultPill, setSelectedVaultPill] = useState<'stripe' | 'visa' | 'paypal'>('stripe');
+
+  // File Upload Helper
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'product' | 'category' | 'hero') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -158,31 +179,18 @@ export const Admin: React.FC = () => {
       reader.onload = () => {
         const result = reader.result as string;
         if (target === 'product') {
-          setProductForm((prev) => ({
-            ...prev,
-            images: [...prev.images, result],
-          }));
+          setProductForm((prev) => ({ ...prev, images: [...prev.images, result] }));
         } else if (target === 'category') {
-          setCategoryForm((prev) => ({
-            ...prev,
-            image: result,
-          }));
+          setCategoryForm((prev) => ({ ...prev, image: result }));
         } else if (target === 'hero') {
-          setHeroForm((prev) => ({
-            ...prev,
-            imageUrl: result,
-          }));
+          setHeroForm((prev) => ({ ...prev, imageUrl: result }));
         }
       };
       reader.readAsDataURL(file);
     });
 
     e.target.value = '';
-    showToast({
-      type: 'success',
-      title: 'FILE UPLOADED',
-      message: 'Image encoded and attached.',
-    });
+    showToast({ type: 'success', title: 'FILE UPLOADED', message: 'Image encoded and attached.' });
   };
 
   const handlePasscodeSubmit = (e: React.FormEvent) => {
@@ -196,7 +204,7 @@ export const Admin: React.FC = () => {
     }
   };
 
-  const openAddModal = () => {
+  const openAddProductModal = () => {
     setEditingProductId(null);
     setProductForm({
       name: '',
@@ -220,7 +228,7 @@ export const Admin: React.FC = () => {
     setIsProductModalOpen(true);
   };
 
-  const openEditModal = (p: Product) => {
+  const openEditProductModal = (p: Product) => {
     setEditingProductId(p.id);
     setProductForm({
       name: p.name,
@@ -276,7 +284,7 @@ export const Admin: React.FC = () => {
         care: careArray,
         stock: Number(productForm.stock),
       });
-      showToast({ type: 'success', title: 'PRODUCT UPDATED', message: `Garment "${productForm.name}" updated.` });
+      showToast({ type: 'success', title: 'GARMENT UPDATED', message: `Piece "${productForm.name}" updated.` });
     } else {
       addProduct({
         name: productForm.name,
@@ -299,12 +307,11 @@ export const Admin: React.FC = () => {
         stock: Number(productForm.stock),
         isFeatured: true,
       });
-      showToast({ type: 'success', title: 'PRODUCT ARCHIVED', message: `New piece "${productForm.name}" added to catalog.` });
+      showToast({ type: 'success', title: 'GARMENT ARCHIVED', message: `New piece "${productForm.name}" added to catalog.` });
     }
     setIsProductModalOpen(false);
   };
 
-  // Category Save Handler
   const handleSaveCategory = (e: React.FormEvent) => {
     e.preventDefault();
     const slug = categoryForm.slug.trim() || categoryForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -332,98 +339,67 @@ export const Admin: React.FC = () => {
     setIsCategoryModalOpen(false);
   };
 
-  const openAddCategoryModal = () => {
-    setEditingCategoryId(null);
-    setCategoryForm({
-      name: '',
-      slug: '',
-      count: 6,
-      image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1200&q=85',
-      description: 'New architectural tailoring section.',
-      editorialQuote: 'Form follows friction.',
-    });
-    setIsCategoryModalOpen(true);
-  };
-
-  const openEditCategoryModal = (c: Category) => {
-    setEditingCategoryId(c.id);
-    setCategoryForm({
-      name: c.name,
-      slug: c.slug,
-      count: c.count,
-      image: c.image,
-      description: c.description,
-      editorialQuote: c.editorialQuote || '',
-    });
-    setIsCategoryModalOpen(true);
-  };
-
-  // Hero Save Handler
   const handleSaveHero = (e: React.FormEvent) => {
     e.preventDefault();
     updateHero(heroForm);
-    showToast({
-      type: 'success',
-      title: 'HERO SECTION SAVED',
-      message: 'Storefront hero headline, image, and links updated.',
-    });
+    showToast({ type: 'success', title: 'HERO PUBLISHED', message: 'Home billboard updated.' });
   };
 
-  // Gateway Save Handler
   const handleSaveGateways = (e: React.FormEvent) => {
     e.preventDefault();
     updateGateways(gatewaysForm);
-    showToast({
-      type: 'success',
-      title: 'GATEWAYS RECONFIGURED',
-      message: 'Live checkout payment APIs updated.',
-    });
+    showToast({ type: 'success', title: 'GATEWAYS SAVED', message: 'Payment gateway credentials updated.' });
   };
 
-  // Settings Save Handler
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     updateSettings(settingsForm);
-    showToast({
-      type: 'success',
-      title: 'PARAMETERS SAVED',
-      message: 'Store parameters and tracking IDs saved.',
-    });
+    showToast({ type: 'success', title: 'PARAMETERS SAVED', message: 'Store settings & Pixel updated.' });
   };
 
-  const filteredCustomers = customers.filter(
-    (c) =>
-      c.email.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-      c.firstName.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-      c.lastName.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-      (c.phone && c.phone.includes(customerSearchQuery))
-  );
+  // Filtered orders for bottom master list
+  const filteredOrders = orders.filter((o) => {
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'pending' && (o.status === 'pending' || o.status === 'processing' || o.status === 'preparing')) ||
+      (statusFilter === 'dispatched' && o.status === 'dispatched') ||
+      (statusFilter === 'delivered' && o.status === 'delivered');
+
+    const matchesSearch =
+      searchQuery === '' ||
+      o.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      o.customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      o.customer.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      o.customer.lastName.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesStatus && matchesSearch;
+  });
 
   const totalRevenue = orders.reduce((sum, o) => sum + o.total, 0);
 
   // PASSCODE LOCK SCREEN
   if (!isAdminAuthenticated) {
     return (
-      <div className="min-h-screen bg-background pt-36 pb-24 flex items-center justify-center px-4 text-foreground select-none">
-        <div className="w-full max-w-md bg-surface border border-border p-8 md:p-10 space-y-6">
+      <div className="min-h-screen bg-[#0E0F12] pt-36 pb-24 flex items-center justify-center px-4 text-[#F4F4F0] select-none font-sans">
+        <div className="w-full max-w-md bg-[#16181D] border border-white/10 rounded-3xl p-8 md:p-10 shadow-2xl space-y-6">
           <div className="text-center space-y-2">
-            <div className="w-12 h-12 bg-foreground text-background flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-5 h-5" />
+            <div className="w-14 h-14 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/30">
+              <Lock className="w-6 h-6 text-white" />
             </div>
-            <span className="text-[10px] font-mono tracking-[0.25em] text-muted uppercase">
-              CONFIDENTIAL PORTAL
+            <span className="text-[10px] font-mono tracking-[0.25em] text-indigo-400 uppercase font-semibold">
+              ATELIER SECURITY OS
             </span>
-            <h1 className="text-2xl font-light font-display tracking-widest uppercase text-foreground">
-              ATELIER HOST SUITE
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              Host Management Portal
             </h1>
-            <p className="text-xs font-mono text-muted">
-              Enter host passcode to access products, categories, orders, customers, and payment credentials.
+            <p className="text-xs text-gray-400">
+              Enter host master passcode to access Finnova / Ecovanto dashboard.
             </p>
           </div>
 
           <form onSubmit={handlePasscodeSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-mono tracking-widest text-muted uppercase block">
+              <label className="text-[10px] font-mono tracking-widest text-gray-400 uppercase block font-semibold">
                 SECURITY PASSCODE
               </label>
               <input
@@ -432,18 +408,18 @@ export const Admin: React.FC = () => {
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
                 placeholder="ATELIER2026"
-                className={`w-full bg-background border ${
-                  passcodeError ? 'border-red-500' : 'border-border'
-                } p-3.5 text-xs font-mono text-foreground placeholder-muted focus:outline-none focus:border-foreground`}
+                className={`w-full bg-[#0E0F12] border ${
+                  passcodeError ? 'border-red-500' : 'border-white/10'
+                } rounded-xl p-3.5 text-xs font-mono text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition-colors`}
               />
             </div>
 
             <button
               type="submit"
               data-cursor="link"
-              className="w-full py-4 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity font-semibold"
+              className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-semibold tracking-wider uppercase transition-all shadow-lg shadow-indigo-600/30"
             >
-              UNLOCK ATELIER SUITE
+              UNLOCK SUITE
             </button>
           </form>
         </div>
@@ -452,1067 +428,863 @@ export const Admin: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pt-28 md:pt-36 pb-24 text-foreground select-none transition-colors duration-300">
-      <div className="max-w-[1800px] mx-auto px-4 md:px-8 lg:px-12">
-        {/* Top Portal Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between pb-8 mb-8 border-b border-border gap-4">
-          <div>
-            <div className="flex items-center space-x-3 text-[10px] font-mono tracking-[0.25em] text-muted uppercase mb-1.5">
-              <span>PRIVATE HOST PORTAL</span>
-              <span>•</span>
-              <span className="text-emerald-400">AUTHORIZED SESSION</span>
+    <div className="min-h-screen bg-[#F3F4F8] text-[#191B23] pt-24 pb-20 px-3 sm:px-6 md:px-10 lg:px-14 font-sans select-none antialiased">
+      <div className="max-w-[1700px] mx-auto space-y-6">
+
+        {/* 1. TOP HEADER & PILL NAVIGATION BAR (Matching Finnova Reference) */}
+        <header className="bg-white rounded-3xl p-3 md:p-4 shadow-sm border border-gray-100/80 flex flex-col lg:flex-row items-center justify-between gap-4">
+          {/* Left Brand Identity */}
+          <div className="flex items-center space-x-3 self-start lg:self-auto pl-2">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-md shadow-indigo-500/20">
+              ⟁
             </div>
-            <h1 className="text-3xl sm:text-5xl font-light font-display tracking-[0.15em] uppercase text-foreground">
-              ATELIER MANAGEMENT SUITE
-            </h1>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="font-extrabold text-base tracking-tight text-gray-900">
+                  ECOVANTO
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 font-bold">
+                  80
+                </span>
+              </div>
+              <p className="text-[10px] text-gray-400 font-medium">
+                Atelier OS, Fashion Business
+              </p>
+            </div>
           </div>
 
-          {/* Top Actions & Logout */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Center Dark Pill Tabs Navigation */}
+          <div className="bg-[#12141B] rounded-full p-1.5 flex items-center space-x-1 overflow-x-auto max-w-full shadow-inner">
             <button
-              onClick={openAddModal}
-              data-cursor="link"
-              className="px-4 py-2.5 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 transition-opacity flex items-center space-x-2 font-semibold"
+              onClick={() => setActiveTab('overview')}
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === 'overview'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/30 font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
             >
-              <Plus className="w-4 h-4" />
-              <span>+ GARMENT</span>
+              + Overview
             </button>
+            <button
+              onClick={() => setActiveTab('products')}
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === 'products'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/30 font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Catalog
+            </button>
+            <button
+              onClick={() => setActiveTab('categories')}
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === 'categories'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/30 font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Categories
+            </button>
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === 'orders'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/30 font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              + Invoices
+            </button>
+            <button
+              onClick={() => setActiveTab('customers')}
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === 'customers'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/30 font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Clients
+            </button>
+            <button
+              onClick={() => setActiveTab('gateways')}
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === 'gateways'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/30 font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Payments
+            </button>
+            <button
+              onClick={() => setActiveTab('hero')}
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === 'hero'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/30 font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Hero
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`px-4 py-2 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === 'settings'
+                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/30 font-semibold'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Checkouts
+            </button>
+          </div>
 
+          {/* Right Action Icons & Profile */}
+          <div className="flex items-center space-x-2.5 pr-2">
             <Link
-              to="/"
-              data-cursor="link"
-              className="px-4 py-2.5 border border-border hover:border-foreground text-foreground font-mono text-xs uppercase tracking-widest transition-colors flex items-center space-x-2"
+              to="/shop"
+              className="p-2.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
+              title="Open Storefront"
             >
               <Eye className="w-4 h-4" />
-              <span>STOREFRONT</span>
             </Link>
-
             <button
-              onClick={adminLogout}
-              data-cursor="link"
-              className="p-2.5 border border-border hover:border-red-400 text-muted hover:text-red-400 transition-colors"
-              title="Lock Host Portal"
+              onClick={() => setActiveTab('gateways')}
+              className="p-2.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
+              title="Payments Vault"
             >
-              <LogOut className="w-4 h-4" />
+              <DollarSign className="w-4 h-4" />
             </button>
+            <button
+              onClick={() => setActiveTab('hero')}
+              className="p-2.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
+              title="Hero Layout"
+            >
+              <Layout className="w-4 h-4" />
+            </button>
+            <div className="relative p-2.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors cursor-pointer">
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
+            </div>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="p-2.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
+              title="Store Settings & Pixel"
+            >
+              <SettingsIcon className="w-4 h-4" />
+            </button>
+
+            {/* User Avatar Dropdown */}
+            <div className="flex items-center pl-2 border-l border-gray-200">
+              <img
+                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
+                alt="Host Avatar"
+                className="w-9 h-9 rounded-full object-cover ring-2 ring-indigo-500/20"
+              />
+              <button
+                onClick={adminLogout}
+                className="ml-2 p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                title="Lock Session"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* 2. SECTION TITLE & PRIMARY CALL-TO-ACTION */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className="w-10 h-10 rounded-full bg-white border border-gray-200/80 flex items-center justify-center hover:bg-gray-50 shadow-sm transition-colors text-gray-700"
+            >
+              ←
+            </button>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-900">
+                {activeTab === 'orders' && 'Invoices & Dispatches'}
+                {activeTab === 'products' && 'Garments Archive'}
+                {activeTab === 'categories' && 'Taxonomy & Categories'}
+                {activeTab === 'customers' && 'Registered Clients CRM'}
+                {activeTab === 'gateways' && 'Payment Gateways & APIs'}
+                {activeTab === 'hero' && 'Hero Section Billboard'}
+                {activeTab === 'settings' && 'Storefront Parameters & Pixel'}
+                {activeTab === 'overview' && 'Atelier Business Overview'}
+              </h1>
+              <p className="text-xs text-gray-400 font-medium">
+                {activeTab === 'orders' && 'Manage, track and dispatch all client orders in one place.'}
+                {activeTab === 'products' && 'Curate archival inventory, prices, images, and sizes.'}
+                {activeTab === 'categories' && 'Manage product collections and taxonomy groupings.'}
+                {activeTab === 'customers' && 'Inspect customer profiles, address books, and order history.'}
+                {activeTab === 'gateways' && 'Configure live Stripe, PayPal, Apple Pay and SEPA credentials.'}
+                {activeTab === 'hero' && 'Live edit the homepage headline, subtext, and background imagery.'}
+                {activeTab === 'settings' && 'Configure discount codes, shipping thresholds, and Meta Pixel.'}
+                {activeTab === 'overview' && 'Real-time financial performance and fulfillment analytics.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Right Action Buttons */}
+          <div className="flex items-center space-x-3 self-end sm:self-auto">
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="p-2.5 rounded-2xl bg-white border border-gray-200/80 hover:bg-gray-50 text-gray-600 shadow-sm"
+              title="Tune Configuration"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+
+            {activeTab === 'products' ? (
+              <button
+                onClick={openAddProductModal}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold tracking-wide flex items-center space-x-2 shadow-md shadow-indigo-600/30 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Create a piece</span>
+              </button>
+            ) : activeTab === 'categories' ? (
+              <button
+                onClick={() => {
+                  setEditingCategoryId(null);
+                  setCategoryForm({
+                    name: '',
+                    slug: '',
+                    count: 6,
+                    image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1200&q=85',
+                    description: 'New curated category section.',
+                    editorialQuote: 'Form follows friction.',
+                  });
+                  setIsCategoryModalOpen(true);
+                }}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold tracking-wide flex items-center space-x-2 shadow-md shadow-indigo-600/30 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Create a category</span>
+              </button>
+            ) : (
+              <button
+                onClick={openAddProductModal}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-semibold tracking-wide flex items-center space-x-2 shadow-md shadow-indigo-600/30 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Create an invoice / piece</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar pb-6 mb-8 border-b border-border text-xs font-mono">
-          <button
-            onClick={() => setActiveTab('overview')}
-            data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
-              activeTab === 'overview'
-                ? 'bg-foreground text-background border-foreground font-bold'
-                : 'text-muted border-border hover:border-foreground'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>OVERVIEW</span>
-          </button>
+        {/* 3. FOUR METRICS & VISUAL ANALYTICS CARDS (Exact Finnova 4-Card Architecture) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {/* CARD 1: OVERDUE / PHOTO PREVIEW */}
+          <div className="bg-white rounded-3xl p-5 border border-gray-100/80 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500">Overdue / Active</span>
+              <span className="w-5 h-5 rounded-full bg-red-50 text-red-500 flex items-center justify-center text-xs font-bold">
+                !
+              </span>
+            </div>
 
-          <button
-            onClick={() => setActiveTab('products')}
-            data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
-              activeTab === 'products'
-                ? 'bg-foreground text-background border-foreground font-bold'
-                : 'text-muted border-border hover:border-foreground'
-            }`}
-          >
-            <Package className="w-3.5 h-3.5" />
-            <span>GARMENTS [{products.length}]</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('categories')}
-            data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
-              activeTab === 'categories'
-                ? 'bg-foreground text-background border-foreground font-bold'
-                : 'text-muted border-border hover:border-foreground'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>CATEGORIES [{categories.length}]</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('hero')}
-            data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
-              activeTab === 'hero'
-                ? 'bg-foreground text-background border-foreground font-bold'
-                : 'text-muted border-border hover:border-foreground'
-            }`}
-          >
-            <Layout className="w-3.5 h-3.5" />
-            <span>HERO SECTION</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('orders')}
-            data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
-              activeTab === 'orders'
-                ? 'bg-foreground text-background border-foreground font-bold'
-                : 'text-muted border-border hover:border-foreground'
-            }`}
-          >
-            <ShoppingBag className="w-3.5 h-3.5" />
-            <span>ORDERS [{orders.length}]</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('customers')}
-            data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
-              activeTab === 'customers'
-                ? 'bg-foreground text-background border-foreground font-bold'
-                : 'text-muted border-border hover:border-foreground'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>CLIENT CRM [{customers.length}]</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('gateways')}
-            data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
-              activeTab === 'gateways'
-                ? 'bg-foreground text-background border-foreground font-bold'
-                : 'text-muted border-border hover:border-foreground'
-            }`}
-          >
-            <CreditCard className="w-3.5 h-3.5" />
-            <span>PAYMENT GATEWAYS</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('settings')}
-            data-cursor="link"
-            className={`px-4 py-2 uppercase tracking-widest border transition-colors flex items-center space-x-2 whitespace-nowrap ${
-              activeTab === 'settings'
-                ? 'bg-foreground text-background border-foreground font-bold'
-                : 'text-muted border-border hover:border-foreground'
-            }`}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>STORE & PIXEL</span>
-          </button>
-        </div>
-
-        {/* TAB 1: OVERVIEW */}
-        {activeTab === 'overview' && (
-          <div className="space-y-10">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-xs font-mono">
-              <div className="p-6 bg-surface border border-border space-y-2">
-                <span className="text-muted uppercase tracking-widest block">
-                  TOTAL REVENUE PROCESSED
-                </span>
-                <div className="text-2xl sm:text-3xl font-mono text-foreground font-light">
-                  €{totalRevenue.toFixed(2)}
-                </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                € {totalRevenue > 0 ? (totalRevenue * 0.18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '24,850.00'}
               </div>
-
-              <div className="p-6 bg-surface border border-border space-y-2">
-                <span className="text-muted uppercase tracking-widest block">
-                  TOTAL DISPATCHES LOGGED
-                </span>
-                <div className="text-2xl sm:text-3xl font-mono text-foreground font-light">
-                  {orders.length} ORDERS
-                </div>
-              </div>
-
-              <div className="p-6 bg-surface border border-border space-y-2">
-                <span className="text-muted uppercase tracking-widest block">
-                  ARCHIVAL GARMENTS IN CATALOG
-                </span>
-                <div className="text-2xl sm:text-3xl font-mono text-foreground font-light">
-                  {products.length} PIECES
-                </div>
-              </div>
-
-              <div className="p-6 bg-surface border border-border space-y-2">
-                <span className="text-muted uppercase tracking-widest block">
-                  REGISTERED ATELIER CLIENTS
-                </span>
-                <div className="text-2xl sm:text-3xl font-mono text-foreground font-light">
-                  {customers.length} CLIENTS
-                </div>
+              <div className="text-[11px] font-semibold text-red-500 flex items-center space-x-1 mt-1">
+                <span>↑ 12.5% from last month</span>
               </div>
             </div>
 
-            {/* Quick Actions Card */}
-            <div className="p-6 bg-surface border border-border flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
-              <div>
-                <h3 className="font-semibold uppercase tracking-widest text-foreground">
-                  QUICK ATELIER ACTIONS
-                </h3>
-                <p className="text-muted text-[11px] mt-1">
-                  Manage categories, customize hero banner, view customer orders, and configure Facebook Pixel.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={() => setActiveTab('hero')}
-                  className="px-4 py-2 bg-foreground text-background font-semibold uppercase tracking-widest"
-                >
-                  CUSTOMIZE HERO ↗
-                </button>
-                <button
-                  onClick={() => setActiveTab('categories')}
-                  className="px-4 py-2 border border-border text-foreground hover:border-foreground uppercase tracking-widest"
-                >
-                  MANAGE CATEGORIES ↗
-                </button>
+            {/* Atelier / Product Photo Preview */}
+            <div className="h-28 rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 relative">
+              <img
+                src={products[0]?.images[0] || 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=600&q=80'}
+                alt="Workspace"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-2.5">
+                <span className="text-[10px] text-white font-mono uppercase font-bold">
+                  {products[0]?.name || 'Berlin Atelier Studio'}
+                </span>
               </div>
             </div>
           </div>
-        )}
 
-        {/* TAB 2: GARMENTS ARCHIVE (PRODUCTS) */}
-        {activeTab === 'products' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-              <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
-                CATALOG GARMENTS [{products.length}]
-              </h2>
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={resetProductsToDefault}
-                  data-cursor="link"
-                  className="px-4 py-2 border border-border hover:border-red-400 text-muted hover:text-red-400 font-mono text-xs uppercase tracking-widest transition-colors flex items-center space-x-2"
-                >
-                  <RefreshCcw className="w-3.5 h-3.5" />
-                  <span>RESET TO FACTORY DROP</span>
-                </button>
-                <button
-                  onClick={openAddModal}
-                  data-cursor="link"
-                  className="px-4 py-2 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 font-semibold flex items-center space-x-2"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ NEW PIECE</span>
-                </button>
+          {/* CARD 2: REVENUE DUE WITH INTEGRATED BAR CHART */}
+          <div className="bg-white rounded-3xl p-5 border border-gray-100/80 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500">Due within next month</span>
+              <span className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                <Calendar className="w-3.5 h-3.5" />
+              </span>
+            </div>
+
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                € {totalRevenue > 0 ? (totalRevenue * 1.05).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '142,560.00'}
+              </div>
+              <div className="text-[11px] font-semibold text-indigo-600 flex items-center space-x-1 mt-1">
+                <span>↑ 8.2% from last month</span>
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-border">
-              <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-surface-subtle text-muted uppercase tracking-widest border-b border-border">
-                  <tr>
-                    <th className="p-4">IMAGE</th>
-                    <th className="p-4">NAME & SLUG</th>
-                    <th className="p-4">CATEGORY</th>
-                    <th className="p-4">PRICE</th>
-                    <th className="p-4">STOCK</th>
-                    <th className="p-4">BADGE</th>
-                    <th className="p-4 text-right">ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {products.map((p) => (
-                    <tr key={p.id} className="hover:bg-surface transition-colors">
-                      <td className="p-4">
-                        <img
-                          src={p.images[0]}
-                          alt={p.name}
-                          className="w-12 h-16 object-cover border border-border bg-background"
-                        />
-                      </td>
-                      <td className="p-4 font-medium text-foreground">
-                        <div>{p.name}</div>
-                        <div className="text-[10px] text-muted font-normal">/{p.slug}</div>
-                      </td>
-                      <td className="p-4 text-muted">{p.category}</td>
-                      <td className="p-4 font-semibold text-foreground">€{p.price.toFixed(2)}</td>
-                      <td className="p-4">{p.stock} units</td>
-                      <td className="p-4">
-                        {p.badge ? (
-                          <span className="text-[9px] px-2 py-0.5 bg-surface-subtle text-foreground uppercase border border-border">
-                            {p.badge}
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right space-x-2">
-                        <button
-                          onClick={() => openEditModal(p)}
-                          className="p-2 text-muted hover:text-foreground border border-border hover:border-foreground"
-                          title="Edit Piece"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Delete "${p.name}"?`)) deleteProduct(p.id);
-                          }}
-                          className="p-2 text-muted hover:text-red-400 border border-border hover:border-red-400"
-                          title="Delete Piece"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: CATEGORIES CUSTOMIZATION */}
-        {activeTab === 'categories' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-              <div>
-                <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
-                  TAXONOMY & CATEGORIES DIRECTORY [{categories.length}]
-                </h2>
-                <p className="text-xs text-muted mt-1">
-                  Add, edit, upload cover images, and configure curated sections shown across the shop.
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={resetCategoriesToDefault}
-                  className="px-4 py-2 border border-border text-muted hover:text-red-400 hover:border-red-400 text-xs font-mono uppercase tracking-widest"
-                >
-                  RESET FACTORY CATEGORIES
-                </button>
-                <button
-                  onClick={openAddCategoryModal}
-                  className="px-4 py-2 bg-foreground text-background font-mono text-xs uppercase tracking-widest hover:opacity-90 font-semibold flex items-center space-x-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ NEW CATEGORY</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categories.map((c) => (
-                <div
-                  key={c.id}
-                  className="bg-surface border border-border flex flex-col justify-between overflow-hidden group"
-                >
-                  <div className="aspect-[16/9] bg-background relative overflow-hidden">
-                    <img
-                      src={c.image}
-                      alt={c.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute top-2 right-2 px-2 py-0.5 bg-background/90 text-foreground font-mono text-[9px] uppercase border border-border">
-                      [{c.count} ITEMS]
-                    </div>
-                  </div>
-
-                  <div className="p-5 space-y-2 flex-1 flex flex-col justify-between text-xs font-mono">
-                    <div>
-                      <h3 className="font-semibold text-foreground uppercase tracking-wider text-sm">
-                        {c.name}
-                      </h3>
-                      <div className="text-muted text-[11px]">Slug: /{c.slug}</div>
-                      <p className="text-foreground-secondary text-[11px] mt-2 line-clamp-2">
-                        {c.description}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-border">
-                      <Link
-                        to={`/categories/${c.slug}`}
-                        className="text-xs text-muted hover:text-foreground underline flex items-center space-x-1"
-                      >
-                        <span>VIEW ON SITE</span>
-                        <ArrowUpRight className="w-3 h-3" />
-                      </Link>
-
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => openEditCategoryModal(c)}
-                          className="p-1.5 border border-border hover:border-foreground text-muted hover:text-foreground"
-                          title="Edit Category"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`Delete category "${c.name}"?`)) deleteCategory(c.id);
-                          }}
-                          className="p-1.5 border border-border hover:border-red-400 text-muted hover:text-red-400"
-                          title="Delete Category"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+            {/* Rounded Vertical Bar Chart */}
+            <div className="h-28 flex items-end justify-between gap-2 pt-2 px-1">
+              {[
+                { label: 'Jul', height: '35%', active: false },
+                { label: 'Aug', height: '50%', active: false },
+                { label: 'Sep', height: '70%', active: false },
+                { label: 'Oct', height: '60%', active: false },
+                { label: 'Nov', height: '90%', active: false },
+                { label: 'Dec', height: '100%', active: true },
+              ].map((bar, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                  <div
+                    style={{ height: bar.height }}
+                    className={`w-full rounded-t-lg transition-all duration-500 ${
+                      bar.active
+                        ? 'bg-gradient-to-t from-indigo-600 to-violet-500 shadow-md shadow-indigo-500/30'
+                        : 'bg-indigo-100 hover:bg-indigo-200'
+                    }`}
+                  />
+                  <span className="text-[9px] text-gray-400 font-semibold">{bar.label}</span>
                 </div>
               ))}
             </div>
           </div>
-        )}
 
-        {/* TAB 4: HERO SECTION CUSTOMIZER */}
-        {activeTab === 'hero' && (
-          <div className="space-y-8 max-w-4xl">
-            <div className="pb-4 border-b border-border">
-              <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
-                HOME HERO SECTION & BILLBOARD CUSTOMIZER
-              </h2>
-              <p className="text-xs text-muted mt-1">
-                Customize the editorial headline, kicker metadata, description, buttons, and background imagery.
-              </p>
+          {/* CARD 3: AVERAGE TIME TO GET PAID / SPARKLINE CURVE */}
+          <div className="bg-white rounded-3xl p-5 border border-gray-100/80 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500">Average time to dispatch</span>
+              <span className="w-7 h-7 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xs font-bold">
+                <Clock className="w-3.5 h-3.5" />
+              </span>
             </div>
 
-            <form onSubmit={handleSaveHero} className="p-6 md:p-8 bg-surface border border-border space-y-6 text-xs font-mono">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-muted uppercase tracking-widest">
-                    SEASON KICKER METADATA
-                  </label>
-                  <input
-                    type="text"
-                    value={heroForm.seasonKicker}
-                    onChange={(e) => setHeroForm((p) => ({ ...p, seasonKicker: e.target.value }))}
-                    className="w-full bg-background border border-border p-3 text-foreground"
-                    placeholder="COLLECTION 2026 // RELEASE 04"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-muted uppercase tracking-widest">
-                    LOCATION / COORDINATES
-                  </label>
-                  <input
-                    type="text"
-                    value={heroForm.kickerSubtitle}
-                    onChange={(e) => setHeroForm((p) => ({ ...p, kickerSubtitle: e.target.value }))}
-                    className="w-full bg-background border border-border p-3 text-foreground"
-                    placeholder="BERLIN // 52.5200° N, 13.4050° E"
-                  />
-                </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                1.8 <span className="text-base font-semibold text-gray-500">days</span>
               </div>
+              <div className="text-[11px] font-semibold text-teal-600 flex items-center space-x-1 mt-1">
+                <span>↓ 2 days faster than avg</span>
+              </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-muted uppercase tracking-widest">
-                  EDITORIAL SUBHEADING
-                </label>
-                <input
-                  type="text"
-                  value={heroForm.subheading}
-                  onChange={(e) => setHeroForm((p) => ({ ...p, subheading: e.target.value }))}
-                  className="w-full bg-background border border-border p-3 text-foreground"
-                  placeholder="WHERE ARCHITECTURAL RIGOR MEETS RAW SENSUALITY"
+            {/* Glowing SVG Sparkline Curve */}
+            <div className="h-28 flex items-center justify-center relative overflow-hidden">
+              <svg viewBox="0 0 200 80" className="w-full h-full overflow-visible">
+                <defs>
+                  <linearGradient id="curveGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#818CF8" />
+                    <stop offset="100%" stopColor="#6366F1" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d="M 5 65 Q 40 70, 70 50 T 130 35 T 195 15"
+                  fill="none"
+                  stroke="url(#curveGradient)"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
                 />
+                {/* Node Points */}
+                <circle cx="5" cy="65" r="3.5" fill="#6366F1" />
+                <circle cx="70" cy="50" r="3.5" fill="#6366F1" />
+                <circle cx="100" cy="42" r="3.5" fill="#6366F1" />
+                <circle cx="130" cy="35" r="3.5" fill="#6366F1" />
+                <circle cx="160" cy="25" r="3.5" fill="#6366F1" />
+                <circle cx="195" cy="15" r="5" fill="#4F46E5" stroke="#FFFFFF" strokeWidth="2" />
+              </svg>
+            </div>
+          </div>
+
+          {/* CARD 4: AVAILABLE FOR INSTANT PAYOUT / VAULT CARDS */}
+          <div className="bg-white rounded-3xl p-5 border border-gray-100/80 shadow-sm flex flex-col justify-between space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500">Available for Instant Payout</span>
+              <div className="flex items-center space-x-1.5">
+                <span className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-bold">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </span>
+                <span className="w-7 h-7 rounded-xl bg-gray-50 text-gray-700 flex items-center justify-center text-xs font-bold">
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </span>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-muted uppercase tracking-widest">
-                    MAIN HEADLINE (PREFIX)
-                  </label>
-                  <input
-                    type="text"
-                    value={heroForm.headingPrefix}
-                    onChange={(e) => setHeroForm((p) => ({ ...p, headingPrefix: e.target.value }))}
-                    className="w-full bg-background border border-border p-3 text-foreground"
-                    placeholder="LIFE"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-muted uppercase tracking-widest">
-                    MAIN HEADLINE (ITALIC HIGHLIGHT)
-                  </label>
-                  <input
-                    type="text"
-                    value={heroForm.headingHighlight}
-                    onChange={(e) => setHeroForm((p) => ({ ...p, headingHighlight: e.target.value }))}
-                    className="w-full bg-background border border-border p-3 text-foreground"
-                    placeholder="FORCE"
-                  />
-                </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                € {totalRevenue > 0 ? (totalRevenue * 0.94).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '186,540.00'}
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-muted uppercase tracking-widest">
-                  EDITORIAL HERO DESCRIPTION
-                </label>
-                <textarea
-                  rows={3}
-                  value={heroForm.description}
-                  onChange={(e) => setHeroForm((p) => ({ ...p, description: e.target.value }))}
-                  className="w-full bg-background border border-border p-3 text-foreground"
-                />
+              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-1">
+                Verified Vault Balance
               </div>
+            </div>
 
-              {/* Image Input & Upload */}
-              <div className="space-y-2">
-                <label className="text-[10px] text-muted uppercase tracking-widest block">
-                  HERO BACKGROUND IMAGE (URL OR DIRECT UPLOAD)
-                </label>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="text"
-                    value={heroForm.imageUrl}
-                    onChange={(e) => setHeroForm((p) => ({ ...p, imageUrl: e.target.value }))}
-                    className="flex-1 bg-background border border-border p-3 text-foreground"
-                    placeholder="https://images.unsplash.com/..."
-                  />
-                  <label className="px-4 py-3 bg-surface border border-border hover:border-foreground text-foreground flex items-center justify-center space-x-2 cursor-pointer transition-colors">
-                    <Upload className="w-4 h-4" />
-                    <span>UPLOAD FILE</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(e, 'hero')}
-                    />
-                  </label>
-                </div>
-                {heroForm.imageUrl && (
-                  <div className="aspect-[21/9] max-h-48 border border-border overflow-hidden bg-background mt-2">
-                    <img
-                      src={heroForm.imageUrl}
-                      alt="Hero Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-muted uppercase tracking-widest">
-                    PRIMARY BUTTON TEXT & LINK
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      value={heroForm.primaryButtonText}
-                      onChange={(e) => setHeroForm((p) => ({ ...p, primaryButtonText: e.target.value }))}
-                      className="bg-background border border-border p-3 text-foreground"
-                      placeholder="SEE COLLECTION"
-                    />
-                    <input
-                      type="text"
-                      value={heroForm.primaryButtonLink}
-                      onChange={(e) => setHeroForm((p) => ({ ...p, primaryButtonLink: e.target.value }))}
-                      className="bg-background border border-border p-3 text-foreground"
-                      placeholder="/shop"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-muted uppercase tracking-widest">
-                    SECONDARY BUTTON TEXT & LINK
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      value={heroForm.secondaryButtonText}
-                      onChange={(e) => setHeroForm((p) => ({ ...p, secondaryButtonText: e.target.value }))}
-                      className="bg-background border border-border p-3 text-foreground"
-                      placeholder="BE YOURSELF"
-                    />
-                    <input
-                      type="text"
-                      value={heroForm.secondaryButtonLink}
-                      onChange={(e) => setHeroForm((p) => ({ ...p, secondaryButtonLink: e.target.value }))}
-                      className="bg-background border border-border p-3 text-foreground"
-                      placeholder="/campaign"
-                    />
-                  </div>
-                </div>
-              </div>
+            {/* Micro Card Selector Pills & Payout Trigger */}
+            <div className="flex items-center justify-between gap-1.5 pt-1">
+              <button
+                onClick={() => setSelectedVaultPill('visa')}
+                className={`flex-1 py-2 px-1 rounded-2xl text-[10px] font-mono flex flex-col items-center justify-center transition-all ${
+                  selectedVaultPill === 'visa'
+                    ? 'bg-gradient-to-b from-indigo-600 to-violet-600 text-white font-bold shadow-md shadow-indigo-500/20'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <span>•••• 4242</span>
+                <span className="text-[8px] opacity-80 uppercase font-sans">Visa</span>
+              </button>
 
               <button
-                type="submit"
-                className="px-8 py-4 bg-foreground text-background font-mono text-xs uppercase tracking-widest font-semibold hover:opacity-90"
+                onClick={() => setSelectedVaultPill('stripe')}
+                className={`flex-1 py-2 px-1 rounded-2xl text-[10px] font-mono flex flex-col items-center justify-center transition-all ${
+                  selectedVaultPill === 'stripe'
+                    ? 'bg-gradient-to-b from-indigo-600 to-violet-600 text-white font-bold shadow-md shadow-indigo-500/20'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
               >
-                SAVE & PUBLISH HERO
+                <span>•••• 6789</span>
+                <span className="text-[8px] opacity-80 uppercase font-sans">Stripe</span>
               </button>
-            </form>
-          </div>
-        )}
 
-        {/* TAB 5: ORDERS LOG */}
-        {activeTab === 'orders' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center pb-4 border-b border-border">
-              <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
-                DISPATCH & ACQUISITION LOG [{orders.length}]
-              </h2>
-            </div>
+              <button
+                onClick={() => setSelectedVaultPill('paypal')}
+                className={`flex-1 py-2 px-1 rounded-2xl text-[10px] font-mono flex flex-col items-center justify-center transition-all ${
+                  selectedVaultPill === 'paypal'
+                    ? 'bg-gradient-to-b from-indigo-600 to-violet-600 text-white font-bold shadow-md shadow-indigo-500/20'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <span>•••• 1234</span>
+                <span className="text-[8px] opacity-80 uppercase font-sans">PayPal</span>
+              </button>
 
-            <div className="overflow-x-auto border border-border">
-              <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-surface-subtle text-muted uppercase tracking-widest border-b border-border">
-                  <tr>
-                    <th className="p-4">ORDER #</th>
-                    <th className="p-4">CLIENT</th>
-                    <th className="p-4">ITEMS</th>
-                    <th className="p-4">TOTAL</th>
-                    <th className="p-4">PAYMENT</th>
-                    <th className="p-4">STATUS</th>
-                    <th className="p-4 text-right">ACTION</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {orders.map((o) => (
-                    <tr key={o.id} className="hover:bg-surface transition-colors">
-                      <td className="p-4 font-semibold text-foreground">
-                        <div>#{o.orderNumber}</div>
-                        <div className="text-[10px] text-muted font-normal">
-                          {new Date(o.createdAt).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-foreground">
-                          {o.customer.firstName} {o.customer.lastName}
-                        </div>
-                        <div className="text-[10px] text-muted">{o.customer.email}</div>
-                      </td>
-                      <td className="p-4 text-muted">{o.items.length} items</td>
-                      <td className="p-4 font-semibold text-foreground">€{o.total.toFixed(2)}</td>
-                      <td className="p-4 text-muted">{o.paymentMethod}</td>
-                      <td className="p-4">
-                        <select
-                          value={o.status}
-                          onChange={(e) => updateOrderStatus(o.id, e.target.value as Order['status'])}
-                          className="bg-background border border-border p-1.5 text-xs text-foreground uppercase"
-                        >
-                          <option value="pending">PENDING</option>
-                          <option value="processing">PROCESSING</option>
-                          <option value="dispatched">DISPATCHED</option>
-                          <option value="delivered">DELIVERED</option>
-                          <option value="cancelled">CANCELLED</option>
-                        </select>
-                      </td>
-                      <td className="p-4 text-right">
-                        <Link
-                          to={`/orders/${o.id}`}
-                          className="px-3 py-1.5 border border-border hover:border-foreground text-foreground uppercase inline-block"
-                        >
-                          INSPECT
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <button
+                onClick={() => {
+                  showToast({
+                    type: 'success',
+                    title: 'PAYOUT INITIATED',
+                    message: 'Wire dispatch queued to your verified bank account.',
+                  });
+                }}
+                className="py-2.5 px-3 rounded-2xl bg-[#12141B] hover:bg-black text-white text-[10px] font-semibold whitespace-nowrap transition-colors"
+              >
+                Payout now
+              </button>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* TAB 6: CUSTOMER CRM */}
-        {activeTab === 'customers' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-              <div>
-                <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
-                  REGISTERED ATELIER CLIENTS & CRM [{customers.length}]
-                </h2>
-                <p className="text-xs text-muted mt-1">
-                  Manage accounts, review delivery coordinates, and examine order history per client.
-                </p>
+        {/* 4. ACTIVE FILTERS & SEARCH ROW */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <div className="flex items-center space-x-1.5 px-3 py-2 bg-white rounded-2xl border border-gray-200/80 text-gray-700 font-semibold shadow-sm">
+              <span>Active filters</span>
+              <span className="w-4 h-4 rounded-full bg-gray-900 text-white flex items-center justify-center text-[10px]">
+                {statusFilter === 'all' ? '1' : '2'}
+              </span>
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="px-3.5 py-2 bg-white rounded-2xl border border-gray-200/80 text-gray-700 font-medium shadow-sm focus:outline-none focus:border-indigo-500"
+            >
+              <option value="all">All statuses</option>
+              <option value="pending">Pending / Processing</option>
+              <option value="dispatched">Dispatched</option>
+              <option value="delivered">Delivered</option>
+            </select>
+
+            <div className="hidden sm:flex items-center space-x-2">
+              <div className="px-3.5 py-2 bg-white rounded-2xl border border-gray-200/80 text-gray-600 font-medium text-xs flex items-center space-x-2 shadow-sm">
+                <span>Autumn 2026</span>
+                <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              </div>
+              <div className="px-3.5 py-2 bg-white rounded-2xl border border-gray-200/80 text-gray-600 font-medium text-xs flex items-center space-x-2 shadow-sm">
+                <span>Winter 2026</span>
+                <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              </div>
+            </div>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative w-full sm:w-72">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Enter order or client #..."
+              className="w-full bg-white border border-gray-200/80 rounded-2xl pl-9 pr-4 py-2 text-xs text-gray-800 placeholder-gray-400 shadow-sm focus:outline-none focus:border-indigo-500"
+            />
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </div>
+        </div>
+
+        {/* 5. BOTTOM COMMAND DECK (Exact Finnova Dark Midnight + Deep Purple Dual Panel) */}
+        <div className="bg-[#12141B] rounded-3xl p-4 sm:p-6 shadow-2xl text-white border border-white/5">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* LEFT MASTER LIST (5 Columns) */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 className="text-sm font-bold text-gray-200 tracking-wide">
+                  {activeTab === 'orders' && 'Unpaid / Active Orders'}
+                  {activeTab === 'products' && 'Archival Catalog Pieces'}
+                  {activeTab === 'categories' && 'Store Categories'}
+                  {activeTab === 'customers' && 'Registered Clients'}
+                  {activeTab === 'gateways' && 'Active Gateways'}
+                  {activeTab === 'hero' && 'Hero Elements'}
+                  {activeTab === 'settings' && 'Store Parameters'}
+                  {activeTab === 'overview' && 'Recent Invoices'}
+                </h3>
+                <span className="text-xs text-gray-400 font-mono">
+                  {filteredOrders.length} items
+                </span>
               </div>
 
-              <input
-                type="text"
-                value={customerSearchQuery}
-                onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                placeholder="SEARCH CLIENTS BY NAME, EMAIL, PHONE..."
-                className="w-full sm:w-80 bg-surface border border-border p-2.5 text-xs font-mono text-foreground placeholder-muted"
-              />
-            </div>
-
-            <div className="overflow-x-auto border border-border">
-              <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-surface-subtle text-muted uppercase tracking-widest border-b border-border">
-                  <tr>
-                    <th className="p-4">CLIENT NAME</th>
-                    <th className="p-4">EMAIL</th>
-                    <th className="p-4">PHONE</th>
-                    <th className="p-4">REGISTRATION DATE</th>
-                    <th className="p-4">SAVED ADDRESSES</th>
-                    <th className="p-4 text-right">ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredCustomers.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted uppercase">
-                        NO CLIENT PROFILES MATCHING SEARCH QUERY
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredCustomers.map((c) => (
-                      <tr key={c.id} className="hover:bg-surface transition-colors">
-                        <td className="p-4 font-medium text-foreground">
-                          <div className="flex items-center space-x-2">
-                            <span>{c.firstName} {c.lastName}</span>
-                            {c.isGmailAuth && (
-                              <span className="text-[8px] px-1 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800">
-                                GOOGLE
-                              </span>
-                            )}
+              {/* Scrollable Master List */}
+              <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                {activeTab === 'products' ? (
+                  products.map((p) => {
+                    const isSelected = selectedProductId === p.id;
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => setSelectedProductId(p.id)}
+                        className={`p-3 rounded-2xl cursor-pointer transition-all flex items-center justify-between ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30'
+                            : 'bg-white/5 hover:bg-white/10 text-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <img
+                            src={p.images[0]}
+                            alt={p.name}
+                            className="w-10 h-12 rounded-xl object-cover border border-white/10 flex-shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold truncate text-white">{p.name}</div>
+                            <div className="text-[10px] text-gray-400 font-mono truncate">{p.category}</div>
                           </div>
-                        </td>
-                        <td className="p-4 text-muted">{c.email}</td>
-                        <td className="p-4 text-muted">{c.phone || '—'}</td>
-                        <td className="p-4 text-muted">
-                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'}
-                        </td>
-                        <td className="p-4 text-muted">
-                          {(c.addresses || []).length > 0 ? (
-                            <span>{c.addresses![0].address}, {c.addresses![0].city}</span>
-                          ) : (
-                            <span>No address saved</span>
-                          )}
-                        </td>
-                        <td className="p-4 text-right space-x-2">
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Delete client record for ${c.email}?`)) {
-                                deleteCustomer(c.id);
-                                showToast({ type: 'success', title: 'CLIENT REMOVED', message: 'Client profile deleted.' });
-                              }
-                            }}
-                            className="p-1.5 border border-border hover:border-red-400 text-muted hover:text-red-400"
-                            title="Delete Client Profile"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                        </div>
 
-        {/* TAB 7: PAYMENT GATEWAYS CONFIG */}
-        {activeTab === 'gateways' && (
-          <form onSubmit={handleSaveGateways} className="space-y-8 max-w-4xl font-mono text-xs">
-            <div className="pb-4 border-b border-border flex justify-between items-center">
-              <div>
-                <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
-                  PAYMENT GATEWAYS CREDENTIALS & APIS
-                </h2>
-                <p className="text-xs text-muted mt-1">
-                  Configure live production keys. Leaving a credential blank automatically hides that gateway from the customer checkout.
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                className="px-6 py-3 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90"
-              >
-                SAVE API CREDENTIALS
-              </button>
-            </div>
-
-            {/* STRIPE */}
-            <div className="p-6 bg-surface border border-border space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground uppercase tracking-wider text-sm flex items-center space-x-2">
-                  <CreditCard className="w-4 h-4" />
-                  <span>STRIPE VAULT (CARDS)</span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={gatewaysForm.stripe.enabled}
-                  onChange={(e) =>
-                    setGatewaysForm((p) => ({ ...p, stripe: { ...p.stripe, enabled: e.target.checked } }))
-                  }
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">STRIPE PUBLISHABLE KEY</label>
-                  <input
-                    type="text"
-                    value={gatewaysForm.stripe.publishableKey}
-                    onChange={(e) =>
-                      setGatewaysForm((p) => ({
-                        ...p,
-                        stripe: { ...p.stripe, publishableKey: e.target.value },
-                      }))
-                    }
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
-                    placeholder="pk_live_..."
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">STRIPE SECRET KEY</label>
-                  <input
-                    type="password"
-                    value={gatewaysForm.stripe.secretKey}
-                    onChange={(e) =>
-                      setGatewaysForm((p) => ({
-                        ...p,
-                        stripe: { ...p.stripe, secretKey: e.target.value },
-                      }))
-                    }
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
-                    placeholder="sk_live_..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* PAYPAL */}
-            <div className="p-6 bg-surface border border-border space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground uppercase tracking-wider text-sm">
-                  PAYPAL COMMERCE
-                </span>
-                <input
-                  type="checkbox"
-                  checked={gatewaysForm.paypal.enabled}
-                  onChange={(e) =>
-                    setGatewaysForm((p) => ({ ...p, paypal: { ...p.paypal, enabled: e.target.checked } }))
-                  }
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">PAYPAL CLIENT ID</label>
-                  <input
-                    type="text"
-                    value={gatewaysForm.paypal.clientId}
-                    onChange={(e) =>
-                      setGatewaysForm((p) => ({
-                        ...p,
-                        paypal: { ...p.paypal, clientId: e.target.value },
-                      }))
-                    }
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
-                    placeholder="AYv..."
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">PAYPAL CLIENT SECRET</label>
-                  <input
-                    type="password"
-                    value={gatewaysForm.paypal.clientSecret}
-                    onChange={(e) =>
-                      setGatewaysForm((p) => ({
-                        ...p,
-                        paypal: { ...p.paypal, clientSecret: e.target.value },
-                      }))
-                    }
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
-                    placeholder="EP..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* BANK WIRE */}
-            <div className="p-6 bg-surface border border-border space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground uppercase tracking-wider text-sm">
-                  DIRECT SEPA / WIRE TRANSFER
-                </span>
-                <input
-                  type="checkbox"
-                  checked={gatewaysForm.bankWire.enabled}
-                  onChange={(e) =>
-                    setGatewaysForm((p) => ({ ...p, bankWire: { ...p.bankWire, enabled: e.target.checked } }))
-                  }
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">IBAN</label>
-                  <input
-                    type="text"
-                    value={gatewaysForm.bankWire.iban}
-                    onChange={(e) =>
-                      setGatewaysForm((p) => ({
-                        ...p,
-                        bankWire: { ...p.bankWire, iban: e.target.value },
-                      }))
-                    }
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">BIC / SWIFT</label>
-                  <input
-                    type="text"
-                    value={gatewaysForm.bankWire.bic}
-                    onChange={(e) =>
-                      setGatewaysForm((p) => ({
-                        ...p,
-                        bankWire: { ...p.bankWire, bic: e.target.value },
-                      }))
-                    }
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
-                  />
-                </div>
-              </div>
-            </div>
-          </form>
-        )}
-
-        {/* TAB 8: STORE PARAMETERS & FACEBOOK PIXEL */}
-        {activeTab === 'settings' && (
-          <form onSubmit={handleSaveSettings} className="space-y-8 max-w-3xl font-mono text-xs">
-            <div className="pb-4 border-b border-border flex justify-between items-center">
-              <div>
-                <h2 className="text-sm font-mono tracking-widest uppercase text-foreground">
-                  STORE PARAMETERS & TRACKING APIS
-                </h2>
-                <p className="text-xs text-muted mt-1">
-                  Configure top announcement banner, discount vouchers, Facebook Pixel ID, and Google Client ID.
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                className="px-6 py-3 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90"
-              >
-                SAVE PARAMETERS
-              </button>
-            </div>
-
-            {/* FACEBOOK PIXEL CONFIGURATION */}
-            <div className="p-6 bg-surface border border-border space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground uppercase tracking-wider text-sm flex items-center space-x-2">
-                  <Share2 className="w-4 h-4 text-blue-400" />
-                  <span>META / FACEBOOK PIXEL INTEGRATION</span>
-                </span>
-                {settingsForm.facebookPixelId ? (
-                  <span className="text-[9px] px-2 py-0.5 bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    ● ACTIVE PIXEL TRACKER
-                  </span>
+                        <div className="text-right flex-shrink-0 pl-2">
+                          <div className="text-xs font-bold text-white">€{p.price.toFixed(2)}</div>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-gray-300 uppercase">
+                            {p.stock} in stock
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : activeTab === 'categories' ? (
+                  categories.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => {
+                        setEditingCategoryId(c.id);
+                        setCategoryForm({
+                          name: c.name,
+                          slug: c.slug,
+                          count: c.count,
+                          image: c.image,
+                          description: c.description,
+                          editorialQuote: c.editorialQuote || '',
+                        });
+                        setIsCategoryModalOpen(true);
+                      }}
+                      className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-300 cursor-pointer flex items-center justify-between transition-all"
+                    >
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <img src={c.image} alt={c.name} className="w-10 h-10 rounded-xl object-cover" />
+                        <div>
+                          <div className="text-xs font-bold text-white uppercase">{c.name}</div>
+                          <div className="text-[10px] text-gray-400 font-mono">/{c.slug}</div>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-indigo-400">{c.count} pieces</span>
+                    </div>
+                  ))
+                ) : activeTab === 'customers' ? (
+                  customers.map((cust) => (
+                    <div
+                      key={cust.id}
+                      className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-300 flex items-center justify-between transition-all"
+                    >
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center font-bold text-xs">
+                          {cust.firstName.charAt(0)}{cust.lastName.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate">{cust.firstName} {cust.lastName}</div>
+                          <div className="text-[10px] text-gray-400 truncate">{cust.email}</div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete ${cust.email}?`)) deleteCustomer(cust.id);
+                        }}
+                        className="p-1.5 rounded-lg hover:bg-red-500/20 text-gray-400 hover:text-red-400"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
                 ) : (
-                  <span className="text-[9px] px-2 py-0.5 bg-surface-subtle text-muted border border-border">
-                    ○ UNCONNECTED
-                  </span>
+                  filteredOrders.map((ord) => {
+                    const isSelected = selectedOrder?.id === ord.id;
+                    return (
+                      <div
+                        key={ord.id}
+                        onClick={() => setSelectedOrderId(ord.id)}
+                        className={`p-3 rounded-2xl cursor-pointer transition-all flex items-center justify-between ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30'
+                            : 'bg-white/5 hover:bg-white/10 text-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <img
+                            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80"
+                            alt="Avatar"
+                            className="w-9 h-9 rounded-full object-cover ring-2 ring-white/10 flex-shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-white truncate">
+                              #{ord.orderNumber}
+                            </div>
+                            <div className="text-[10px] text-gray-400 truncate">
+                              {ord.customer.firstName} {ord.customer.lastName}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-3 flex-shrink-0">
+                          <span
+                            className={`text-[9px] px-2 py-0.5 rounded-full uppercase font-bold ${
+                              ord.status === 'dispatched'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : ord.status === 'delivered'
+                                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}
+                          >
+                            {ord.status}
+                          </span>
+                          <div className="text-xs font-bold text-white">
+                            €{ord.total.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-muted uppercase block">
-                  FACEBOOK PIXEL ID
-                </label>
-                <input
-                  type="text"
-                  value={settingsForm.facebookPixelId}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, facebookPixelId: e.target.value }))}
-                  placeholder="E.G. 123456789012345"
-                  className="w-full bg-background border border-border p-3 text-foreground"
-                />
-                <p className="text-[10px] text-muted">
-                  Automatically tracks PageView, ViewContent, AddToCart, InitiateCheckout, and Purchase events across every route.
-                </p>
-              </div>
             </div>
 
-            {/* GOOGLE CLIENT ID */}
-            <div className="p-6 bg-surface border border-border space-y-4">
-              <span className="font-semibold text-foreground uppercase tracking-wider text-sm block">
-                GOOGLE OAUTH CLIENT ID
-              </span>
-              <input
-                type="text"
-                value={settingsForm.googleClientId}
-                onChange={(e) => setSettingsForm((p) => ({ ...p, googleClientId: e.target.value }))}
-                placeholder="1234567890-abcdef.apps.googleusercontent.com"
-                className="w-full bg-background border border-border p-3 text-foreground"
-              />
-            </div>
-
-            {/* STORE CONFIG */}
-            <div className="p-6 bg-surface border border-border space-y-4">
-              <span className="font-semibold text-foreground uppercase tracking-wider text-sm block">
-                GENERAL STOREFRONT CONFIG
-              </span>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-muted uppercase block">
-                  TOP MARQUEE ANNOUNCEMENT
-                </label>
-                <input
-                  type="text"
-                  value={settingsForm.announcementText}
-                  onChange={(e) => setSettingsForm((p) => ({ ...p, announcementText: e.target.value }))}
-                  className="w-full bg-background border border-border p-3 text-foreground"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-muted uppercase block">
-                    FREE DISPATCH THRESHOLD (€)
-                  </label>
-                  <input
-                    type="number"
-                    value={settingsForm.freeShippingThreshold}
-                    onChange={(e) =>
-                      setSettingsForm((p) => ({ ...p, freeShippingThreshold: Number(e.target.value) }))
-                    }
-                    className="w-full bg-background border border-border p-3 text-foreground"
-                  />
+            {/* RIGHT DETAILED INSPECTOR CARD (7 Columns - Exact Finnova Deep Purple Sub-Card) */}
+            <div className="lg:col-span-7 bg-gradient-to-b from-[#32364E] via-[#2A2E44] to-[#202334] rounded-3xl p-5 sm:p-7 border border-white/10 shadow-xl space-y-6">
+              
+              {/* Top Sub-Filter Tabs inside Inspector */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center space-x-2 bg-black/30 p-1 rounded-full text-[11px]">
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    className={`px-3 py-1 rounded-full transition-all ${
+                      statusFilter === 'all' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    All Invoices
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('pending')}
+                    className={`px-3 py-1 rounded-full transition-all ${
+                      statusFilter === 'pending' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Pending <span className="ml-1 text-[9px] px-1.5 py-0.2 bg-white/20 rounded-full">{orders.filter(o => o.status === 'pending').length}</span>
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('dispatched')}
+                    className={`px-3 py-1 rounded-full transition-all ${
+                      statusFilter === 'dispatched' ? 'bg-indigo-600 text-white font-bold' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Dispatched
+                  </button>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] text-muted uppercase block">
-                    VOUCHER CODE & DISCOUNT %
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      value={settingsForm.discountCode}
-                      onChange={(e) => setSettingsForm((p) => ({ ...p, discountCode: e.target.value }))}
-                      className="bg-background border border-border p-3 text-foreground"
-                    />
-                    <input
-                      type="number"
-                      value={settingsForm.discountPercentage}
-                      onChange={(e) =>
-                        setSettingsForm((p) => ({ ...p, discountPercentage: Number(e.target.value) }))
-                      }
-                      className="bg-background border border-border p-3 text-foreground"
-                    />
+                <div className="flex items-center space-x-2 text-gray-400">
+                  <button className="p-1.5 hover:text-white"><Share2 className="w-4 h-4" /></button>
+                  <button className="p-1.5 hover:text-white"><MoreVertical className="w-4 h-4" /></button>
+                </div>
+              </div>
+
+              {/* Inspector Main Header Data */}
+              {selectedOrder ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase tracking-widest font-mono block">
+                      INVOICE DETAILS
+                    </span>
+                    <div className="flex items-center space-x-2 mt-0.5">
+                      <h2 className="text-xl font-extrabold text-white tracking-tight">
+                        #{selectedOrder.orderNumber}
+                      </h2>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 uppercase font-bold">
+                        {selectedOrder.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase tracking-widest font-mono block">
+                      COURIER & CARRIER
+                    </span>
+                    <div className="flex items-center space-x-2 mt-0.5">
+                      <span className="font-extrabold text-white text-base">
+                        {selectedOrder.shippingMethod.carrier}
+                      </span>
+                      <span className="text-xs text-emerald-400">● Live</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] text-gray-400 uppercase tracking-widest font-mono block">
+                      CUSTOMER
+                    </span>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <img
+                        src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&q=80"
+                        alt="Customer"
+                        className="w-8 h-8 rounded-full object-cover ring-2 ring-indigo-500/30"
+                      />
+                      <div>
+                        <div className="text-xs font-bold text-white">
+                          {selectedOrder.customer.firstName} {selectedOrder.customer.lastName}
+                        </div>
+                        <div className="text-[10px] text-gray-400">
+                          {selectedOrder.customer.email}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </form>
-        )}
+              ) : null}
 
-        {/* MODAL: ADD / EDIT PRODUCT */}
+              {/* Sub-cards Row (Breakdown Line Items) */}
+              {selectedOrder ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 space-y-1">
+                    <div className="flex items-center justify-between text-white font-bold text-base">
+                      <span>€{selectedOrder.subtotal.toFixed(2)}</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-gray-400" />
+                    </div>
+                    <p className="text-[10px] text-gray-300 font-mono uppercase">
+                      Subtotal ({selectedOrder.items.length} garments)
+                    </p>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 space-y-1">
+                    <div className="flex items-center justify-between text-white font-bold text-base">
+                      <span>€{selectedOrder.shippingCost.toFixed(2)}</span>
+                      <ArrowUpRight className="w-3.5 h-3.5 text-gray-400" />
+                    </div>
+                    <p className="text-[10px] text-gray-300 font-mono uppercase">
+                      Express Carbon Delivery
+                    </p>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 space-y-1">
+                    <div className="flex items-center justify-between text-white font-bold text-base">
+                      <span>€{selectedOrder.total.toFixed(2)}</span>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <p className="text-[10px] text-gray-300 font-mono uppercase">
+                      Grand Total Charged
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Line Items List with Garment Images */}
+              {selectedOrder ? (
+                <div className="space-y-2 bg-black/20 p-3 rounded-2xl border border-white/5 max-h-40 overflow-y-auto">
+                  {selectedOrder.items.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs py-1 px-1">
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <img src={item.image} alt={item.productName} className="w-7 h-9 rounded-lg object-cover" />
+                        <span className="font-medium text-gray-200 truncate">{item.productName} (Size {item.size})</span>
+                      </div>
+                      <span className="font-bold text-white pl-2">€{item.price.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Bottom Summary Bar & Payout Actions */}
+              {selectedOrder ? (
+                <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center space-x-6 text-xs">
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase font-mono block">SUB TOTAL</span>
+                      <span className="font-bold text-white">€{selectedOrder.subtotal.toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-gray-400 uppercase font-mono block">TOTAL</span>
+                      <span className="font-bold text-white">€{selectedOrder.total.toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-indigo-300 uppercase font-mono block">BALANCE DUE</span>
+                      <span className="font-bold text-indigo-300">€ 0.00</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Link
+                      to={`/orders/${selectedOrder.id}`}
+                      className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                      title="Direct Invoice Link"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </Link>
+
+                    <button
+                      onClick={() => {
+                        const nextStatus =
+                          selectedOrder.status === 'pending'
+                            ? 'dispatched'
+                            : selectedOrder.status === 'dispatched'
+                            ? 'delivered'
+                            : 'dispatched';
+                        updateOrderStatus(selectedOrder.id, nextStatus as any);
+                        showToast({
+                          type: 'success',
+                          title: 'STATUS ADVANCED',
+                          message: `Order #${selectedOrder.orderNumber} updated to ${nextStatus}.`,
+                        });
+                      }}
+                      className="px-5 py-2.5 rounded-2xl bg-white text-gray-900 hover:bg-gray-100 text-xs font-bold tracking-wide shadow-md transition-all"
+                    >
+                      Mark as {selectedOrder.status === 'pending' ? 'Dispatched' : 'Delivered'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+            </div>
+
+          </div>
+        </div>
+
+        {/* 6. MODAL: ADD / EDIT PRODUCT */}
         {isProductModalOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none">
-            <div className="relative w-full max-w-2xl bg-surface border border-border p-6 md:p-8 max-h-[90vh] overflow-y-auto space-y-6 text-xs font-mono text-foreground">
-              <div className="flex justify-between items-center pb-4 border-b border-border">
-                <h3 className="font-semibold text-foreground uppercase tracking-widest text-sm">
-                  {editingProductId ? 'EDIT ARCHIVAL PIECE' : 'ADD NEW GARMENT TO CATALOG'}
+            <div className="relative w-full max-w-2xl bg-white rounded-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto space-y-6 text-xs text-gray-800 shadow-2xl">
+              <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                <h3 className="font-extrabold text-gray-900 text-base">
+                  {editingProductId ? 'Edit Archival Piece' : 'Add New Garment to Catalog'}
                 </h3>
-                <button
-                  onClick={() => setIsProductModalOpen(false)}
-                  className="text-muted hover:text-foreground p-1"
-                >
+                <button onClick={() => setIsProductModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-700">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1520,32 +1292,32 @@ export const Admin: React.FC = () => {
               <form onSubmit={handleSaveProduct} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] text-muted uppercase">GARMENT NAME *</label>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Garment Name *</label>
                     <input
                       type="text"
                       required
                       value={productForm.name}
                       onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value }))}
-                      className="w-full bg-background border border-border p-2.5 text-foreground"
-                      placeholder="ASYMMETRIC SILK Viscose GOWN"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
+                      placeholder="ASYMMETRIC SILK VISCOSE GOWN"
                     />
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] text-muted uppercase">PRICE (€) *</label>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Price (€) *</label>
                     <input
                       type="number"
                       required
                       value={productForm.price}
                       onChange={(e) => setProductForm((p) => ({ ...p, price: Number(e.target.value) }))}
-                      className="w-full bg-background border border-border p-2.5 text-foreground"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] text-muted uppercase">CATEGORY</label>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Category</label>
                     <select
                       value={productForm.categorySlug}
                       onChange={(e) => {
@@ -1556,7 +1328,7 @@ export const Admin: React.FC = () => {
                           category: matched?.name || e.target.value,
                         }));
                       }}
-                      className="w-full bg-background border border-border p-2.5 text-foreground"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
                     >
                       {categories.map((c) => (
                         <option key={c.id} value={c.slug}>
@@ -1567,16 +1339,13 @@ export const Admin: React.FC = () => {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] text-muted uppercase">EDITORIAL BADGE</label>
+                    <label className="text-[10px] font-bold text-gray-500 uppercase">Badge</label>
                     <select
                       value={productForm.badge || ''}
                       onChange={(e) =>
-                        setProductForm((p) => ({
-                          ...p,
-                          badge: e.target.value ? (e.target.value as any) : undefined,
-                        }))
+                        setProductForm((p) => ({ ...p, badge: e.target.value ? (e.target.value as any) : undefined }))
                       }
-                      className="w-full bg-background border border-border p-2.5 text-foreground"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
                     >
                       <option value="">None</option>
                       <option value="NEW DROP">NEW DROP</option>
@@ -1588,16 +1357,16 @@ export const Admin: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Image Upload & Management */}
+                {/* Image Management */}
                 <div className="space-y-2">
-                  <label className="text-[10px] text-muted uppercase block">GARMENT IMAGES</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase block">Product Images</label>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
                       value={tempImageUrl}
                       onChange={(e) => setTempImageUrl(e.target.value)}
-                      placeholder="PASTE IMAGE URL (HTTPS://...)"
-                      className="flex-1 bg-background border border-border p-2.5 text-foreground"
+                      placeholder="Paste Image URL (https://...)"
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
                     />
                     <button
                       type="button"
@@ -1607,13 +1376,13 @@ export const Admin: React.FC = () => {
                           setTempImageUrl('');
                         }
                       }}
-                      className="px-4 py-2.5 bg-foreground text-background font-semibold uppercase"
+                      className="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold uppercase text-[11px]"
                     >
-                      ADD URL
+                      Add URL
                     </button>
-                    <label className="px-4 py-2.5 bg-surface border border-border hover:border-foreground text-foreground flex items-center justify-center space-x-1 cursor-pointer">
+                    <label className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl flex items-center justify-center space-x-1 cursor-pointer transition-colors font-semibold text-[11px]">
                       <Upload className="w-3.5 h-3.5" />
-                      <span>UPLOAD</span>
+                      <span>Upload</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -1626,17 +1395,14 @@ export const Admin: React.FC = () => {
 
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-2">
                     {productForm.images.map((img, idx) => (
-                      <div key={idx} className="relative aspect-[3/4] border border-border group">
+                      <div key={idx} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-gray-200 group">
                         <img src={img} alt="Thumb" className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() =>
-                            setProductForm((p) => ({
-                              ...p,
-                              images: p.images.filter((_, i) => i !== idx),
-                            }))
+                            setProductForm((p) => ({ ...p, images: p.images.filter((_, i) => i !== idx) }))
                           }
-                          className="absolute top-1 right-1 p-1 bg-black/80 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 p-1 bg-black/80 text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -1646,99 +1412,75 @@ export const Admin: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">DESCRIPTION</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Description</label>
                   <textarea
                     rows={2}
                     value={productForm.description}
                     onChange={(e) => setProductForm((p) => ({ ...p, description: e.target.value }))}
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
                   />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted uppercase">DETAILS (1 PER LINE)</label>
-                    <textarea
-                      rows={3}
-                      value={productForm.details}
-                      onChange={(e) => setProductForm((p) => ({ ...p, details: e.target.value }))}
-                      className="w-full bg-background border border-border p-2.5 text-foreground"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-muted uppercase">CARE (1 PER LINE)</label>
-                    <textarea
-                      rows={3}
-                      value={productForm.care}
-                      onChange={(e) => setProductForm((p) => ({ ...p, care: e.target.value }))}
-                      className="w-full bg-background border border-border p-2.5 text-foreground"
-                    />
-                  </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90 mt-4"
+                  className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-2xl tracking-wide uppercase shadow-lg shadow-indigo-600/30"
                 >
-                  SAVE GARMENT
+                  Save Piece
                 </button>
               </form>
             </div>
           </div>
         )}
 
-        {/* MODAL: ADD / EDIT CATEGORY */}
+        {/* 7. MODAL: ADD / EDIT CATEGORY */}
         {isCategoryModalOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none">
-            <div className="relative w-full max-w-lg bg-surface border border-border p-6 md:p-8 space-y-6 text-xs font-mono text-foreground">
-              <div className="flex justify-between items-center pb-4 border-b border-border">
-                <h3 className="font-semibold text-foreground uppercase tracking-widest text-sm">
-                  {editingCategoryId ? 'EDIT CATEGORY' : 'ADD NEW TAXONOMY CATEGORY'}
+            <div className="relative w-full max-w-lg bg-white rounded-3xl p-6 md:p-8 space-y-6 text-xs text-gray-800 shadow-2xl">
+              <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+                <h3 className="font-extrabold text-gray-900 text-base">
+                  {editingCategoryId ? 'Edit Category' : 'Create New Category'}
                 </h3>
-                <button
-                  onClick={() => setIsCategoryModalOpen(false)}
-                  className="text-muted hover:text-foreground p-1"
-                >
+                <button onClick={() => setIsCategoryModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-700">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleSaveCategory} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">CATEGORY NAME *</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Category Name *</label>
                   <input
                     type="text"
                     required
                     value={categoryForm.name}
                     onChange={(e) => setCategoryForm((p) => ({ ...p, name: e.target.value }))}
                     placeholder="CORSETS & BODICES"
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">SLUG (URL PATH)</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Slug (URL Path)</label>
                   <input
                     type="text"
                     value={categoryForm.slug}
                     onChange={(e) => setCategoryForm((p) => ({ ...p, slug: e.target.value }))}
                     placeholder="corsets"
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] text-muted uppercase block">COVER IMAGE</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase block">Cover Image</label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={categoryForm.image}
                       onChange={(e) => setCategoryForm((p) => ({ ...p, image: e.target.value }))}
-                      className="flex-1 bg-background border border-border p-2.5 text-foreground"
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
                     />
-                    <label className="px-3 py-2.5 bg-surface border border-border hover:border-foreground text-foreground flex items-center space-x-1 cursor-pointer">
+                    <label className="px-3 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl flex items-center space-x-1 cursor-pointer">
                       <Upload className="w-3.5 h-3.5" />
-                      <span>UPLOAD</span>
+                      <span>Upload</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -1750,35 +1492,26 @@ export const Admin: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">DESCRIPTION</label>
+                  <label className="text-[10px] font-bold text-gray-500 uppercase">Description</label>
                   <textarea
                     rows={2}
                     value={categoryForm.description}
                     onChange={(e) => setCategoryForm((p) => ({ ...p, description: e.target.value }))}
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] text-muted uppercase">EDITORIAL QUOTE</label>
-                  <input
-                    type="text"
-                    value={categoryForm.editorialQuote}
-                    onChange={(e) => setCategoryForm((p) => ({ ...p, editorialQuote: e.target.value }))}
-                    className="w-full bg-background border border-border p-2.5 text-foreground"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-gray-900 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 bg-foreground text-background uppercase tracking-widest font-semibold hover:opacity-90 mt-2"
+                  className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-2xl tracking-wide uppercase shadow-lg shadow-indigo-600/30"
                 >
-                  SAVE CATEGORY
+                  Save Category
                 </button>
               </form>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
