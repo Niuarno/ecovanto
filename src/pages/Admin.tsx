@@ -968,7 +968,7 @@ export const Admin: React.FC = () => {
                         </div>
 
                         <div className="text-right flex-shrink-0 pl-2">
-                          <div className="text-xs font-bold text-white">€{p.price.toFixed(2)}</div>
+                          <div className="text-xs font-bold text-white">€{(p?.price ?? 0).toFixed(2)}</div>
                           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-gray-300 uppercase">
                             {p.stock} in stock
                           </span>
@@ -1012,7 +1012,7 @@ export const Admin: React.FC = () => {
                     >
                       <div className="flex items-center space-x-3 min-w-0">
                         <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center font-bold text-xs">
-                          {cust.firstName.charAt(0)}{cust.lastName.charAt(0)}
+                          {cust.firstName?.charAt(0) || 'C'}{cust.lastName?.charAt(0) || 'L'}
                         </div>
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-white truncate">{cust.firstName} {cust.lastName}</div>
@@ -1053,7 +1053,7 @@ export const Admin: React.FC = () => {
                               #{ord.orderNumber}
                             </div>
                             <div className="text-[10px] text-gray-400 truncate">
-                              {ord.customer.firstName} {ord.customer.lastName}
+                              {ord.customer?.firstName} {ord.customer?.lastName}
                             </div>
                           </div>
                         </div>
@@ -1071,7 +1071,7 @@ export const Admin: React.FC = () => {
                             {ord.status}
                           </span>
                           <div className="text-xs font-bold text-white">
-                            €{ord.total.toFixed(2)}
+                            €{(ord?.total ?? 0).toFixed(2)}
                           </div>
                         </div>
                       </div>
@@ -1142,7 +1142,7 @@ export const Admin: React.FC = () => {
                     </span>
                     <div className="flex items-center space-x-2 mt-0.5">
                       <span className="font-extrabold text-white text-base">
-                        {selectedOrder.shippingMethod.carrier}
+                        {selectedOrder.shippingMethod?.carrier || 'DHL Express'}
                       </span>
                       <span className="text-xs text-emerald-400">● Live</span>
                     </div>
@@ -1160,10 +1160,10 @@ export const Admin: React.FC = () => {
                       />
                       <div>
                         <div className="text-xs font-bold text-white">
-                          {selectedOrder.customer.firstName} {selectedOrder.customer.lastName}
+                          {selectedOrder.customer?.firstName} {selectedOrder.customer?.lastName}
                         </div>
                         <div className="text-[10px] text-gray-400">
-                          {selectedOrder.customer.email}
+                          {selectedOrder.customer?.email}
                         </div>
                       </div>
                     </div>
@@ -1176,17 +1176,17 @@ export const Admin: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 space-y-1">
                     <div className="flex items-center justify-between text-white font-bold text-base">
-                      <span>€{selectedOrder.subtotal.toFixed(2)}</span>
+                      <span>€{(selectedOrder?.subtotal ?? 0).toFixed(2)}</span>
                       <ArrowUpRight className="w-3.5 h-3.5 text-gray-400" />
                     </div>
                     <p className="text-[10px] text-gray-300 font-mono uppercase">
-                      Subtotal ({selectedOrder.items.length} garments)
+                      Subtotal ({selectedOrder.items?.length || 0} garments)
                     </p>
                   </div>
 
                   <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 space-y-1">
                     <div className="flex items-center justify-between text-white font-bold text-base">
-                      <span>€{selectedOrder.shippingCost.toFixed(2)}</span>
+                      <span>€{(selectedOrder?.shippingCost ?? 0).toFixed(2)}</span>
                       <ArrowUpRight className="w-3.5 h-3.5 text-gray-400" />
                     </div>
                     <p className="text-[10px] text-gray-300 font-mono uppercase">
@@ -1196,7 +1196,7 @@ export const Admin: React.FC = () => {
 
                   <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 space-y-1">
                     <div className="flex items-center justify-between text-white font-bold text-base">
-                      <span>€{selectedOrder.total.toFixed(2)}</span>
+                      <span>€{(selectedOrder?.total ?? 0).toFixed(2)}</span>
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                     </div>
                     <p className="text-[10px] text-gray-300 font-mono uppercase">
@@ -1209,13 +1209,13 @@ export const Admin: React.FC = () => {
               {/* Line Items List with Garment Images */}
               {selectedOrder ? (
                 <div className="space-y-2 bg-black/20 p-3 rounded-2xl border border-white/5 max-h-40 overflow-y-auto">
-                  {selectedOrder.items.map((item, idx) => (
+                  {(selectedOrder.items || []).map((item: any, idx: number) => (
                     <div key={idx} className="flex items-center justify-between text-xs py-1 px-1">
                       <div className="flex items-center space-x-2 min-w-0">
-                        <img src={item.image} alt={item.productName} className="w-7 h-9 rounded-lg object-cover" />
-                        <span className="font-medium text-gray-200 truncate">{item.productName} (Size {item.size})</span>
+                        <img src={item.image || item.product?.images?.[0]} alt={item.productName || item.product?.name} className="w-7 h-9 rounded-lg object-cover" />
+                        <span className="font-medium text-gray-200 truncate">{item.productName || item.product?.name} (Size {item.size})</span>
                       </div>
-                      <span className="font-bold text-white pl-2">€{item.price.toFixed(2)}</span>
+                      <span className="font-bold text-white pl-2">€{((item?.price ?? item?.unitPrice ?? item?.product?.price ?? 0)).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -1227,11 +1227,11 @@ export const Admin: React.FC = () => {
                   <div className="flex items-center space-x-6 text-xs">
                     <div>
                       <span className="text-[10px] text-gray-400 uppercase font-mono block">SUB TOTAL</span>
-                      <span className="font-bold text-white">€{selectedOrder.subtotal.toFixed(2)}</span>
+                      <span className="font-bold text-white">€{(selectedOrder?.subtotal ?? 0).toFixed(2)}</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-gray-400 uppercase font-mono block">TOTAL</span>
-                      <span className="font-bold text-white">€{selectedOrder.total.toFixed(2)}</span>
+                      <span className="font-bold text-white">€{(selectedOrder?.total ?? 0).toFixed(2)}</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-indigo-300 uppercase font-mono block">BALANCE DUE</span>

@@ -166,7 +166,7 @@ interface StoreContextType {
 }
 
 const PRODUCTS_STORAGE_KEY = 'ecovanto_store_products_v4';
-const ORDERS_STORAGE_KEY = 'ecovanto_store_orders_v4';
+const ORDERS_STORAGE_KEY = 'ecovanto_store_orders_v5';
 const SETTINGS_STORAGE_KEY = 'ecovanto_store_settings_v4';
 const CATEGORIES_STORAGE_KEY = 'ecovanto_store_categories_v4';
 const CUSTOMERS_STORAGE_KEY = 'ecovanto_registered_customers_v3';
@@ -212,12 +212,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           },
           items: [
             {
-              product: PRODUCTS[0],
-              quantity: 1,
+              productId: PRODUCTS[0]?.id || 'prod-1',
+              productName: PRODUCTS[0]?.name || 'ASYMMETRIC SILK GOWN',
+              productSlug: PRODUCTS[0]?.slug || 'asymmetric-silk-gown',
+              image: PRODUCTS[0]?.images[0] || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=85',
+              price: PRODUCTS[0]?.price || 340,
               size: 'M',
               color: 'Obsidian Noir',
-              unitPrice: PRODUCTS[0].price,
-              totalPrice: PRODUCTS[0].price,
+              quantity: 1,
             },
           ],
           shippingMethod: {
@@ -227,10 +229,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             price: 18,
             deliveryTime: '1-2 Business Days',
           },
-          subtotal: PRODUCTS[0].price,
+          subtotal: PRODUCTS[0]?.price || 340,
           shippingCost: 18,
-          discountAmount: 0,
-          total: PRODUCTS[0].price + 18,
+          discount: 0,
+          total: (PRODUCTS[0]?.price || 340) + 18,
           paymentMethod: 'Stripe Direct (Encrypted Card)',
           status: 'dispatched',
           trackingNumber: 'DE-DHL-99201847120',
